@@ -1,6 +1,8 @@
 @import "tailwindcss";
 
 :root {
+  --font-geist-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI";
+  --font-geist-mono: "SFMono-Regular", Consolas, "Liberation Mono";
   --ink: #20231e;
   --muted: #74776d;
   --line: #e8e8e1;
@@ -59,6 +61,8 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, a:focus-visib
   border-radius: 22px; padding: 31px 34px 28px; box-shadow: 0 28px 70px #334a3820, 0 2px 8px #2b372d0a;
   backdrop-filter: blur(14px);
 }
+.account-card { width: min(470px, 100%); }
+.account-email { margin-left: auto; max-width: 190px; overflow: hidden; color: var(--muted); font-size: 10px; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
 .auth-copy { margin: 52px 0 28px; }
 .auth-copy h1 { margin: 8px 0 10px; font-family: Georgia, "Songti SC", serif; font-size: 35px; letter-spacing: -.035em; font-weight: 500; }
 .auth-copy p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.65; }
@@ -70,6 +74,26 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, a:focus-visib
 }
 .auth-form input:focus, .editor input:focus, .editor textarea:focus { border-color: #789180; box-shadow: 0 0 0 3px #52735c15; outline: none; }
 .form-error { margin: -4px 0; color: var(--danger); font-size: 12px; }
+.auth-tabs { display: grid; grid-template-columns: 1fr 1fr; margin: -8px 0 18px; padding: 3px; border-radius: 10px; background: #f0f0ea; }
+.auth-tabs button { border: 0; border-radius: 8px; background: transparent; padding: 8px; color: var(--muted); font-size: 11px; font-weight: 650; cursor: pointer; }
+.auth-tabs button.active { background: white; color: var(--green); box-shadow: 0 1px 4px #24332812; }
+.text-button { display: block; margin: 16px auto 0; border: 0; background: transparent; color: #55715e; font-size: 11px; font-weight: 650; text-align: center; text-decoration: none; cursor: pointer; }
+.text-button:hover { text-decoration: underline; }
+.link-button { width: max-content; }
+.link-status { margin: 0; padding: 16px; border-radius: 10px; background: var(--sand); color: var(--muted); font-size: 12px; line-height: 1.6; text-align: center; }
+.success-text { color: var(--green); }
+.email-sent { padding: 60px 4px 30px; text-align: center; }
+.email-sent .success-mark { width: 46px; height: 46px; margin: auto; display: grid; place-items: center; border-radius: 50%; background: var(--green-pale); color: var(--green); font-size: 20px; }
+.email-sent h1 { margin: 22px 0 10px; font-family: Georgia, "Songti SC", serif; font-size: 30px; font-weight: 500; }
+.email-sent p { margin: 0 auto; max-width: 330px; color: var(--muted); font-size: 12px; line-height: 1.7; }
+.email-sent a, .email-sent button { display: block; margin: 18px auto 0; border: 0; background: transparent; color: var(--green); font-size: 11px; font-weight: 650; cursor: pointer; }
+.auth-logout { display: block; margin: 17px auto 0; border: 0; background: transparent; color: #8b8e85; font-size: 10px; cursor: pointer; }
+.recovery-card { width: min(520px, 100%); }
+.recovery-code { display: block; overflow-wrap: anywhere; padding: 17px; border: 1px dashed #aab7ab; border-radius: 11px; background: #f1f5f0; color: var(--green-dark); font-family: var(--font-geist-mono), monospace; font-size: 13px; line-height: 1.8; text-align: center; user-select: all; }
+.copy-recovery { display: block; margin: 12px auto 22px; border: 0; background: transparent; color: var(--green); font-size: 11px; font-weight: 650; cursor: pointer; }
+.recovery-confirm { margin-bottom: 17px; display: flex; align-items: flex-start; gap: 9px; color: #5e625a; font-size: 11px; line-height: 1.5; }
+.recovery-confirm input { margin-top: 1px; accent-color: var(--green); }
+.recovery-card > .primary-button { width: 100%; }
 .security-note { margin-top: 23px; padding-top: 20px; border-top: 1px solid var(--line); display: flex; gap: 12px; color: #7a7c73; font-size: 12px; line-height: 1.55; }
 .security-note > span { color: var(--green); font-size: 10px; margin-top: 3px; }
 .security-note p { margin: 0; }
@@ -97,6 +121,9 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, a:focus-visib
 .sidebar-bottom button span { width: 18px; text-align: center; font-size: 15px; }
 .local-status { margin: 18px 10px 0; display: flex; align-items: center; gap: 7px; color: #999b93; font-size: 9px; }
 .local-status i { width: 6px; height: 6px; border-radius: 50%; background: #62846e; box-shadow: 0 0 0 3px #dfe8e1; }
+.local-status.saving i { background: #af8844; box-shadow: 0 0 0 3px #ede3cc; }
+.local-status.error { color: var(--danger); }
+.local-status.error i { background: var(--danger); box-shadow: 0 0 0 3px #f0dcd8; }
 
 .list-panel { min-height: 100vh; border-right: 1px solid var(--line); background: #fcfcf9; display: flex; flex-direction: column; }
 .panel-header { padding: 31px 26px 19px; display: flex; justify-content: space-between; align-items: center; }

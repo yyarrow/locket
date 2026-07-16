@@ -2,22 +2,45 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-const appUrl = new URL("../app/vault-app.tsx", import.meta.url);
+const read = (path) => readFile(new URL(path, import.meta.url), "utf8");
 
-test("uses browser-native authenticated encryption and local persistence", async () => {
-  const source = await readFile(appUrl, "utf8");
+test("encrypts the vault in the browser with a random data key and recovery key", async () => {
+  const source = await read("../lib/vault-crypto.ts");
+  assert.match(source, /argon2idAsync/);
   assert.match(source, /AES-GCM/);
-  assert.match(source, /PBKDF2/);
-  assert.match(source, /SHA-256/);
-  assert.match(source, /310_000/);
-  assert.match(source, /indexedDB\.open/);
-  assert.doesNotMatch(source, /fetch\(|XMLHttpRequest|WebSocket/);
+  assert.match(source, /dataKeyBytes = crypto\.getRandomValues/);
+  assert.match(source, /recoveryWrappedKey/);
+  assert.match(source, /recoverAndRekeyVault/);
 });
 
-test("keeps the MVP safeguards in place", async () => {
-  const source = await readFile(appUrl, "utf8");
+test("sync schema contains ciphertext metadata but no vault plaintext fields", async () => {
+  const schema = await read("../db/schema.ts");
+  assert.match(schema, /ciphertext: text/);
+  assert.match(schema, /wrappedKey: text/);
+  assert.match(schema, /recoveryWrappedKey: text/);
+  assert.doesNotMatch(schema, /username:|password:|notes:/);
+});
+
+test("account and session safeguards remain enabled", async () => {
+  const [register, session, limiter, vaultRoute] = await Promise.all([
+    read("../app/api/auth/register/route.ts"),
+    read("../lib/session.ts"),
+    read("../lib/rate-limit.ts"),
+    read("../app/api/vault/route.ts"),
+  ]);
+  assert.match(register, /REGISTRATION_MODE/);
+  assert.match(register, /isSameOrigin/);
+  assert.match(session, /httpOnly: true/);
+  assert.match(session, /sameSite: "lax"/);
+  assert.match(limiter, /on conflict \(key\) do update/);
+  assert.match(vaultRoute, /eq\(vaults\.revision, payload\.revision\)/);
+});
+
+test("client keeps local safety controls without plaintext persistence", async () => {
+  const source = await read("../app/vault-app.tsx");
   assert.match(source, /AUTO_LOCK_MS/);
   assert.match(source, /主密码至少需要 12 个字符/);
   assert.match(source, /加密备份/);
   assert.match(source, /navigator\.clipboard/);
+  assert.doesNotMatch(source, /localStorage|sessionStorage|indexedDB/);
 });
