@@ -170,6 +170,17 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, a:focus-visib
 .value-row strong { overflow: hidden; text-overflow: ellipsis; font-family: var(--font-geist-mono), monospace; font-size: 12px; font-weight: 520; white-space: nowrap; }
 .value-row button { border: 0; background: transparent; color: #55715e; font-size: 10px; font-weight: 650; cursor: pointer; }
 .password-row > div { display: flex; gap: 7px; }
+.totp-card { overflow: hidden; border: 1px solid #dfe5de; border-radius: 11px; background: #f8fbf8; }
+.totp-copy { min-height: 76px; padding: 13px 15px 10px; display: flex; align-items: center; justify-content: space-between; gap: 18px; }
+.totp-copy > span { display: grid; gap: 4px; }
+.totp-copy small { color: #868d84; font-size: 9px; }
+.totp-copy strong { color: var(--green-dark); font-family: var(--font-geist-mono), monospace; font-size: 25px; font-weight: 620; letter-spacing: .08em; }
+.totp-copy button { border: 1px solid #d7e0d8; border-radius: 7px; background: white; padding: 7px 11px; color: var(--green); font-size: 10px; font-weight: 650; cursor: pointer; }
+.totp-copy button:disabled { opacity: .45; cursor: default; }
+.totp-timer { padding: 0 15px 11px; display: flex; align-items: center; gap: 10px; }
+.totp-timer > span { height: 3px; flex: 1; overflow: hidden; border-radius: 3px; background: #dfe7df; }
+.totp-timer i { height: 100%; display: block; border-radius: inherit; background: #5f8169; transition: width .25s linear; }
+.totp-timer small { min-width: 60px; color: #8d928a; font-size: 9px; text-align: right; }
 .value-row a { color: #476a53; font-size: 12px; text-decoration: none; }
 .value-row a:hover { text-decoration: underline; }
 .notes-value { margin: 0; padding: 14px; border: 1px solid #e5e6df; border-radius: 10px; background: #fdfdfb; color: #555a52; font-size: 12px; line-height: 1.7; white-space: pre-wrap; }
@@ -194,6 +205,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, a:focus-visib
 .password-input { position: relative; }
 .password-input input { padding-right: 97px; font-family: var(--font-geist-mono), monospace; }
 .password-input button { position: absolute; right: 5px; top: 5px; bottom: 5px; border: 0; border-radius: 6px; background: #eef2ed; color: var(--green); font-size: 9px; font-weight: 650; cursor: pointer; }
+.field-hint { color: #92968e; font-size: 9px; font-weight: 450; line-height: 1.55; }
 .editor .favorite-check { display: flex; align-items: center; gap: 8px; }
 .editor .favorite-check input { width: 15px; height: 15px; accent-color: var(--green); }
 .editor footer { margin-top: 6px; padding-top: 19px; border-top: 1px solid var(--line); display: flex; justify-content: flex-end; gap: 9px; }

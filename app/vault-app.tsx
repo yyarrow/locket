@@ -9,6 +9,13 @@ import {
   unlockVault,
   type VaultEnvelope,
 } from "@/lib/vault-crypto";
+import {
+  formatTotpInput,
+  generateTotp,
+  getTotpRemaining,
+  parseTotpInput,
+  type TotpConfig,
+} from "@/lib/totp";
 
 type Category = "login" | "card" | "note" | "wifi";
 type VaultItem = {
@@ -20,8 +27,10 @@ type VaultItem = {
   notes: string;
   category: Category;
   favorite: boolean;
+  totp?: TotpConfig;
   updatedAt: number;
 };
+type VaultItemDraft = Omit<VaultItem, "id" | "updatedAt" | "totp"> & { totpInput: string };
 type VaultData = { items: VaultItem[]; createdAt: number };
 type Phase = "loading" | "account" | "email-sent" | "setup" | "recovery-save" | "locked" | "recover" | "open";
 
@@ -33,8 +42,8 @@ const categoryMeta: Record<Category, { label: string; glyph: string }> = {
   wifi: { label: "Wi-Fi", glyph: "⌁" },
 };
 
-const emptyDraft = (): Omit<VaultItem, "id" | "updatedAt"> => ({
-  title: "", username: "", password: "", url: "", notes: "", category: "login", favorite: false,
+const emptyDraft = (): VaultItemDraft => ({
+  title: "", username: "", password: "", url: "", notes: "", category: "login", favorite: false, totpInput: "",
 });
 
 function makePassword(length = 20) {
@@ -49,6 +58,42 @@ function makePassword(length = 20) {
     [output[index], output[swap]] = [output[swap], output[index]];
   }
   return output.join("");
+}
+
+function TotpValue({ config, onCopy }: {
+  config: TotpConfig;
+  onCopy: (value: string, label: string, clearAfter: number) => Promise<void>;
+}) {
+  const [now, setNow] = useState(() => Date.now());
+  const [code, setCode] = useState("");
+  const [invalid, setInvalid] = useState(false);
+  const timeStep = Math.floor(now / 1000 / config.period);
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    void generateTotp(config, now).then((next) => {
+      if (active) { setCode(next); setInvalid(false); }
+    }).catch(() => {
+      if (active) { setCode(""); setInvalid(true); }
+    });
+    return () => { active = false; };
+  }, [config, now, timeStep]);
+
+  const remaining = getTotpRemaining(config.period, now);
+  const formatted = code.length === 6 ? `${code.slice(0, 3)} ${code.slice(3)}` : code.length === 8 ? `${code.slice(0, 4)} ${code.slice(4)}` : "—";
+
+  return <div className="totp-card">
+    <div className="totp-copy">
+      <span><small>一次性验证码</small><strong>{invalid ? "密钥无效" : formatted}</strong></span>
+      <button disabled={!code} onClick={() => void onCopy(code, "验证码", remaining * 1000)}>复制</button>
+    </div>
+    <div className="totp-timer"><span><i style={{ width: `${(remaining / config.period) * 100}%` }} /></span><small>{remaining} 秒后更新</small></div>
+  </div>;
 }
 
 function toEnvelope(value: unknown): VaultEnvelope | null {
@@ -97,6 +142,8 @@ export function VaultApp() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [revealed, setRevealed] = useState(false);
   const [editorOpen, setEditorOpen] = useState(false);
+  const [editorError, setEditorError] = useState("");
+  const [totpInputRevealed, setTotpInputRevealed] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState(emptyDraft());
   const [toast, setToast] = useState("");
@@ -299,17 +346,46 @@ export function VaultApp() {
   const selected = data.items.find((item) => item.id === selectedId) ?? filtered[0] ?? null;
   const openNew = () => {
     if (data.items.length >= 500) return setToast("免费版最多保存 500 个条目");
-    setEditingId(null); setDraft({ ...emptyDraft(), password: makePassword() }); setEditorOpen(true);
+    setEditingId(null); setDraft({ ...emptyDraft(), password: makePassword() }); setEditorError(""); setTotpInputRevealed(false); setEditorOpen(true);
   };
   const openEdit = (item: VaultItem) => {
     setEditingId(item.id);
-    setDraft({ title: item.title, username: item.username, password: item.password, url: item.url, notes: item.notes, category: item.category, favorite: item.favorite });
+    setDraft({
+      title: item.title,
+      username: item.username,
+      password: item.password,
+      url: item.url,
+      notes: item.notes,
+      category: item.category,
+      favorite: item.favorite,
+      totpInput: item.totp ? formatTotpInput(item.totp) : "",
+    });
+    setEditorError("");
+    setTotpInputRevealed(false);
     setEditorOpen(true);
   };
   const saveItem = async (event: FormEvent) => {
     event.preventDefault();
     if (!draft.title.trim()) return;
-    const item: VaultItem = { ...draft, title: draft.title.trim(), id: editingId ?? crypto.randomUUID(), updatedAt: Date.now() };
+    let totp: TotpConfig | undefined;
+    try {
+      if (draft.category === "login" && draft.totpInput.trim()) totp = parseTotpInput(draft.totpInput);
+    } catch (cause) {
+      setEditorError(cause instanceof Error ? cause.message : "TOTP 密钥格式无效");
+      return;
+    }
+    const item: VaultItem = {
+      id: editingId ?? crypto.randomUUID(),
+      title: draft.title.trim(),
+      username: draft.username,
+      password: draft.password,
+      url: draft.url,
+      notes: draft.notes,
+      category: draft.category,
+      favorite: draft.favorite,
+      ...(totp ? { totp } : {}),
+      updatedAt: Date.now(),
+    };
     const items = editingId ? data.items.map((current) => current.id === editingId ? item : current) : [item, ...data.items];
     await saveData({ ...data, items }); setSelectedId(item.id); setEditorOpen(false); setToast(editingId ? "条目已更新并同步" : "条目已加密同步");
   };
@@ -322,9 +398,9 @@ export function VaultApp() {
     const items = data.items.map((current) => current.id === item.id ? { ...current, favorite: !current.favorite, updatedAt: Date.now() } : current);
     await saveData({ ...data, items });
   };
-  const copy = async (value: string, label: string) => {
-    await navigator.clipboard.writeText(value); setToast(`${label}已复制，30 秒后尝试清空剪贴板`);
-    setTimeout(async () => { try { if ((await navigator.clipboard.readText()) === value) await navigator.clipboard.writeText(""); } catch { /* permission expired */ } }, 30_000);
+  const copy = async (value: string, label: string, clearAfter = 30_000) => {
+    await navigator.clipboard.writeText(value); setToast(`${label}已复制，${Math.max(1, Math.ceil(clearAfter / 1000))} 秒后尝试清空剪贴板`);
+    setTimeout(async () => { try { if ((await navigator.clipboard.readText()) === value) await navigator.clipboard.writeText(""); } catch { /* permission expired */ } }, clearAfter);
   };
   const exportVault = () => {
     if (!envelope) return;
@@ -411,13 +487,31 @@ export function VaultApp() {
       <div className="item-count">{filtered.length} / 500 个条目</div>
       <div className="item-list">{filtered.length === 0 ? <div className="empty-state"><div>＋</div><h2>{query ? "没有匹配的条目" : "保险库还是空的"}</h2><p>{query ? "试试其他关键词。" : "保存你的第一个登录信息或安全笔记。"}</p>{!query && <button onClick={openNew}>新建条目</button>}</div> : filtered.map((item) => <button className={`item-row ${selected?.id === item.id ? "selected" : ""}`} key={item.id} onClick={() => { setSelectedId(item.id); setRevealed(false); }}><span className={`item-avatar ${item.category}`}>{item.title.slice(0, 1).toUpperCase()}</span><span className="item-text"><strong>{item.title}</strong><small>{item.username || categoryMeta[item.category].label}</small></span>{item.favorite && <span className="favorite-star">★</span>}<span className="chevron">›</span></button>)}</div>
     </section>
-    <section className="detail-panel">{selected ? <><header className="detail-header"><div className={`detail-avatar ${selected.category}`}>{selected.title.slice(0, 1).toUpperCase()}</div><div><h2>{selected.title}</h2><p>{categoryMeta[selected.category].label}</p></div><div className="detail-actions"><button aria-label={selected.favorite ? "取消收藏" : "收藏"} onClick={() => void toggleFavorite(selected)}>{selected.favorite ? "★" : "☆"}</button><button onClick={() => openEdit(selected)}>编辑</button><button className="danger-action" aria-label="删除" onClick={() => void deleteItem(selected)}>•••</button></div></header>
-      <div className="detail-body"><div className="field-group"><p className="field-label">登录信息</p><div className="value-row"><span><small>用户名</small><strong>{selected.username || "—"}</strong></span>{selected.username && <button onClick={() => void copy(selected.username, "用户名")}>复制</button>}</div><div className="value-row password-row"><span><small>密码</small><strong>{revealed ? selected.password : "••••••••••••••"}</strong></span><div><button onClick={() => setRevealed((value) => !value)}>{revealed ? "隐藏" : "显示"}</button>{selected.password && <button onClick={() => void copy(selected.password, "密码")}>复制</button>}</div></div></div>
-        {selected.url && <div className="field-group"><p className="field-label">网站</p><div className="value-row"><a href={selected.url.startsWith("http") ? selected.url : `https://${selected.url}`} target="_blank" rel="noreferrer">{selected.url} <span>↗</span></a><button onClick={() => void copy(selected.url, "网址")}>复制</button></div></div>}{selected.notes && <div className="field-group"><p className="field-label">备注</p><p className="notes-value">{selected.notes}</p></div>}<p className="updated-time">上次更新于 {new Date(selected.updatedAt).toLocaleString("zh-CN")}</p></div>
+    <section className="detail-panel">{selected ? <>
+      <header className="detail-header">
+        <div className={`detail-avatar ${selected.category}`}>{selected.title.slice(0, 1).toUpperCase()}</div>
+        <div><h2>{selected.title}</h2><p>{categoryMeta[selected.category].label}</p></div>
+        <div className="detail-actions"><button aria-label={selected.favorite ? "取消收藏" : "收藏"} onClick={() => void toggleFavorite(selected)}>{selected.favorite ? "★" : "☆"}</button><button onClick={() => openEdit(selected)}>编辑</button><button className="danger-action" aria-label="删除" onClick={() => void deleteItem(selected)}>•••</button></div>
+      </header>
+      <div className="detail-body">
+        <div className="field-group"><p className="field-label">登录信息</p><div className="value-row"><span><small>用户名</small><strong>{selected.username || "—"}</strong></span>{selected.username && <button onClick={() => void copy(selected.username, "用户名")}>复制</button>}</div><div className="value-row password-row"><span><small>密码</small><strong>{revealed ? selected.password : "••••••••••••••"}</strong></span><div><button onClick={() => setRevealed((value) => !value)}>{revealed ? "隐藏" : "显示"}</button>{selected.password && <button onClick={() => void copy(selected.password, "密码")}>复制</button>}</div></div></div>
+        {selected.totp && <div className="field-group"><p className="field-label">动态验证码</p><TotpValue config={selected.totp} onCopy={copy} /></div>}
+        {selected.url && <div className="field-group"><p className="field-label">网站</p><div className="value-row"><a href={selected.url.startsWith("http") ? selected.url : `https://${selected.url}`} target="_blank" rel="noreferrer">{selected.url} <span>↗</span></a><button onClick={() => void copy(selected.url, "网址")}>复制</button></div></div>}
+        {selected.notes && <div className="field-group"><p className="field-label">备注</p><p className="notes-value">{selected.notes}</p></div>}
+        <p className="updated-time">上次更新于 {new Date(selected.updatedAt).toLocaleString("zh-CN")}</p>
+      </div>
     </> : <div className="detail-empty"><div className="brand-mark">L</div><h2>选择一个条目</h2><p>查看、复制或编辑保存在保险库中的信息。</p></div>}</section>
     {editorOpen && <div className="modal-backdrop" role="presentation" onMouseDown={() => setEditorOpen(false)}><section className="editor" role="dialog" aria-modal="true" aria-labelledby="editor-title" onMouseDown={(event) => event.stopPropagation()}><header><div><span className="eyebrow">端到端加密条目</span><h2 id="editor-title">{editingId ? "编辑条目" : "新建条目"}</h2></div><button aria-label="关闭" onClick={() => setEditorOpen(false)}>×</button></header><form onSubmit={saveItem}>
       <div className="category-picker">{(Object.keys(categoryMeta) as Category[]).map((key) => <button type="button" key={key} className={draft.category === key ? "active" : ""} onClick={() => setDraft({ ...draft, category: key })}><span>{categoryMeta[key].glyph}</span>{categoryMeta[key].label}</button>)}</div>
-      <label>名称<input autoFocus required value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} placeholder="例如：GitHub" /></label><label>用户名<input value={draft.username} onChange={(event) => setDraft({ ...draft, username: event.target.value })} placeholder="邮箱或用户名" /></label><label>密码<div className="password-input"><input value={draft.password} onChange={(event) => setDraft({ ...draft, password: event.target.value })} /><button type="button" onClick={() => setDraft({ ...draft, password: makePassword() })}>重新生成</button></div></label><label>网址<input value={draft.url} onChange={(event) => setDraft({ ...draft, url: event.target.value })} placeholder="https://example.com" /></label><label>备注<textarea value={draft.notes} onChange={(event) => setDraft({ ...draft, notes: event.target.value })} placeholder="可选的安全备注" /></label><label className="favorite-check"><input type="checkbox" checked={draft.favorite} onChange={(event) => setDraft({ ...draft, favorite: event.target.checked })} /> 添加到收藏</label><footer><button type="button" onClick={() => setEditorOpen(false)}>取消</button><button className="primary-button">保存并同步</button></footer>
+      <label>名称<input autoFocus required value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} placeholder="例如：GitHub" /></label>
+      <label>用户名<input value={draft.username} onChange={(event) => setDraft({ ...draft, username: event.target.value })} placeholder="邮箱或用户名" /></label>
+      <label>密码<div className="password-input"><input value={draft.password} onChange={(event) => setDraft({ ...draft, password: event.target.value })} /><button type="button" onClick={() => setDraft({ ...draft, password: makePassword() })}>重新生成</button></div></label>
+      {draft.category === "login" && <label>动态验证码密钥<div className="password-input"><input type={totpInputRevealed ? "text" : "password"} value={draft.totpInput} onChange={(event) => { setDraft({ ...draft, totpInput: event.target.value }); setEditorError(""); }} placeholder="粘贴 otpauth:// 链接或设置密钥" autoComplete="off" spellCheck={false} /><button type="button" onClick={() => setTotpInputRevealed((value) => !value)}>{totpInputRevealed ? "隐藏" : "显示"}</button></div><small className="field-hint">密钥只会进入端到端加密保险库，验证码在本地生成。</small></label>}
+      <label>网址<input value={draft.url} onChange={(event) => setDraft({ ...draft, url: event.target.value })} placeholder="https://example.com" /></label>
+      <label>备注<textarea value={draft.notes} onChange={(event) => setDraft({ ...draft, notes: event.target.value })} placeholder="可选的安全备注" /></label>
+      <label className="favorite-check"><input type="checkbox" checked={draft.favorite} onChange={(event) => setDraft({ ...draft, favorite: event.target.checked })} /> 添加到收藏</label>
+      {editorError && <p className="form-error">{editorError}</p>}
+      <footer><button type="button" onClick={() => setEditorOpen(false)}>取消</button><button className="primary-button">保存并同步</button></footer>
     </form></section></div>}
     {toast && <div className="toast" role="status">✓ {toast}</div>}
   </main>;
