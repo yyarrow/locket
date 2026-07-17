@@ -4,7 +4,7 @@
 
 ## 功能
 
-- 开放注册、邮箱验证、登录密码重置与可撤销会话
+- 邮箱一次性链接登录、开放注册与可撤销会话
 - Argon2id 密钥派生与 AES-256-GCM 信封加密
 - 独立恢复密钥，可在忘记主密码后重新包装数据密钥
 - Neon 密文同步与乐观并发控制
@@ -32,7 +32,7 @@ npm run typecheck
 npm test
 ```
 
-生产环境必须配置 `DATABASE_URL`、`AUTH_SECRET` 和 `EMAIL_FROM`，邮件可选择 `RESEND_API_KEY` 或 `SMTP_*`。`APP_URL` 未设置时自动使用 Vercel 生产域名；`REGISTRATION_MODE=open` 开放注册，改为其他值可临时关闭注册。
+生产环境必须配置 `DATABASE_URL`、`AUTH_SECRET` 和 `EMAIL_FROM`，邮件可选择 `RESEND_API_KEY` 或 `SMTP_*`。`APP_URL` 未设置时自动使用 Vercel 生产域名；`REGISTRATION_MODE=open` 允许新邮箱通过一次性链接创建账号，改为其他值后仅现有账号可以登录。
 
 ## 安全边界
 

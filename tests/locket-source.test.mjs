@@ -22,14 +22,17 @@ test("sync schema contains ciphertext metadata but no vault plaintext fields", a
 });
 
 test("account and session safeguards remain enabled", async () => {
-  const [register, session, limiter, vaultRoute] = await Promise.all([
-    read("../app/api/auth/register/route.ts"),
+  const [emailLink, verify, session, limiter, vaultRoute] = await Promise.all([
+    read("../app/api/auth/email-link/route.ts"),
+    read("../app/api/auth/verify/route.ts"),
     read("../lib/session.ts"),
     read("../lib/rate-limit.ts"),
     read("../app/api/vault/route.ts"),
   ]);
-  assert.match(register, /REGISTRATION_MODE/);
-  assert.match(register, /isSameOrigin/);
+  assert.match(emailLink, /REGISTRATION_MODE/);
+  assert.match(emailLink, /isSameOrigin/);
+  assert.match(emailLink, /checkRateLimit/);
+  assert.match(verify, /createSession/);
   assert.match(session, /httpOnly: true/);
   assert.match(session, /sameSite: "lax"/);
   assert.match(limiter, /on conflict \(key\) do update/);
@@ -43,4 +46,5 @@ test("client keeps local safety controls without plaintext persistence", async (
   assert.match(source, /加密备份/);
   assert.match(source, /navigator\.clipboard/);
   assert.doesNotMatch(source, /localStorage|sessionStorage|indexedDB/);
+  assert.doesNotMatch(source, /登录密码|\/api\/auth\/login|\/api\/auth\/register/);
 });

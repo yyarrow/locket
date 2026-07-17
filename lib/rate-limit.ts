@@ -8,7 +8,8 @@ import { authSecret } from "./secrets";
 export async function checkRateLimit(request: Request, scope: string, limit: number, windowSeconds: number, discriminator = "") {
   const forwarded = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
   const secret = authSecret();
-  const digest = createHash("sha256").update(`${secret}:${scope}:${forwarded}:${discriminator}`).digest("hex");
+  const identity = discriminator || forwarded;
+  const digest = createHash("sha256").update(`${secret}:${scope}:${identity}`).digest("hex");
   const key = `${scope}:${digest}`;
   const expiresAt = new Date(Date.now() + windowSeconds * 1000);
   const rows = await db.execute<{ count: number }>(sql`

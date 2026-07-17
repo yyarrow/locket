@@ -45,14 +45,8 @@ async function deliver(to: string, subject: string, html: string) {
   await transporter.sendMail({ from: process.env.EMAIL_FROM, to, subject, html });
 }
 
-export async function sendVerificationEmail(email: string, token: string) {
+export async function sendLoginEmail(email: string, token: string) {
   const url = `${appUrl()}/verify?token=${encodeURIComponent(token)}`;
-  await deliver(email, "验证你的 Locket 邮箱", `<p>点击下面的链接验证邮箱并开始使用 Locket：</p><p><a href="${url}">验证邮箱</a></p><p>链接将在 1 小时后失效。</p>`);
-  return process.env.NODE_ENV === "production" ? undefined : url;
-}
-
-export async function sendResetEmail(email: string, token: string) {
-  const url = `${appUrl()}/reset?token=${encodeURIComponent(token)}`;
-  await deliver(email, "重置你的 Locket 登录密码", `<p>点击下面的链接重置登录密码：</p><p><a href="${url}">重置登录密码</a></p><p>这不会重置保险库主密码。链接将在 1 小时后失效。</p>`);
+  await deliver(email, "登录 Locket", `<p>点击下面的链接登录 Locket：</p><p><a href="${url}">登录 Locket</a></p><p>链接将在 15 分钟后失效，且只能使用一次。如果不是你发起的请求，请忽略此邮件。</p>`);
   return process.env.NODE_ENV === "production" ? undefined : url;
 }

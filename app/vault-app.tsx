@@ -24,7 +24,6 @@ type VaultItem = {
 };
 type VaultData = { items: VaultItem[]; createdAt: number };
 type Phase = "loading" | "account" | "email-sent" | "setup" | "recovery-save" | "locked" | "recover" | "open";
-type AccountMode = "login" | "register" | "forgot";
 
 const AUTO_LOCK_MS = 5 * 60 * 1000;
 const categoryMeta: Record<Category, { label: string; glyph: string }> = {
@@ -83,12 +82,7 @@ async function requestJson<T>(url: string, options?: RequestInit): Promise<T> {
 
 export function VaultApp() {
   const [phase, setPhase] = useState<Phase>("loading");
-  const [accountMode, setAccountMode] = useState<AccountMode>("login");
   const [accountEmail, setAccountEmail] = useState("");
-  const [accountPassword, setAccountPassword] = useState("");
-  const [accountPasswordConfirmation, setAccountPasswordConfirmation] = useState("");
-  const [showAccountPassword, setShowAccountPassword] = useState(false);
-  const [showAccountPasswordConfirmation, setShowAccountPasswordConfirmation] = useState(false);
   const [emailPreviewUrl, setEmailPreviewUrl] = useState("");
   const [masterPassword, setMasterPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -206,36 +200,13 @@ export function VaultApp() {
   const handleAccount = async (event: FormEvent) => {
     event.preventDefault();
     setError("");
-    if (accountMode === "register" && accountPassword !== accountPasswordConfirmation) {
-      setError("两次输入的登录密码不一致。");
-      return;
-    }
     setBusy(true);
     try {
-      if (accountMode === "forgot") {
-        const response = await requestJson<{ previewUrl?: string }>("/api/auth/forgot", {
-          method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email: accountEmail }),
-        });
-        setEmailPreviewUrl(response.previewUrl ?? "");
-        setPhase("email-sent");
-      } else if (accountMode === "register") {
-        const response = await requestJson<{ previewUrl?: string }>("/api/auth/register", {
-          method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email: accountEmail, password: accountPassword }),
-        });
-        setAccountPassword("");
-        setAccountPasswordConfirmation("");
-        setShowAccountPassword(false);
-        setShowAccountPasswordConfirmation(false);
-        setEmailPreviewUrl(response.previewUrl ?? "");
-        setPhase("email-sent");
-      } else {
-        await requestJson("/api/auth/login", {
-          method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email: accountEmail, password: accountPassword }),
-        });
-        setAccountPassword("");
-        setAccountPasswordConfirmation("");
-        await boot();
-      }
+      const response = await requestJson<{ previewUrl?: string }>("/api/auth/email-link", {
+        method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email: accountEmail }),
+      });
+      setEmailPreviewUrl(response.previewUrl ?? "");
+      setPhase("email-sent");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "操作失败");
     } finally { setBusy(false); }
@@ -313,8 +284,7 @@ export function VaultApp() {
 
   const logout = async () => {
     await requestJson("/api/auth/logout", { method: "POST" }).catch(() => null);
-    dataKeyRef.current = null; setEnvelope(null); setData({ items: [], createdAt: 0 }); setAccountPassword("");
-    setAccountMode("login"); setPhase("account");
+    dataKeyRef.current = null; setEnvelope(null); setData({ items: [], createdAt: 0 }); setPhase("account");
   };
 
   const filtered = useMemo(() => {
@@ -377,19 +347,15 @@ export function VaultApp() {
   if (phase === "account" || phase === "email-sent") {
     return <main className="auth-shell"><section className="auth-card account-card">
       <div className="brand-row"><div className="brand-mark">L</div><span>Locket</span></div>
-      {phase === "email-sent" ? <div className="email-sent"><span className="success-mark">✓</span><h1>检查你的邮箱</h1><p>邮件里的链接会在 1 小时后失效。账号密码重置不会重置保险库主密码。</p>{emailPreviewUrl && <a href={emailPreviewUrl}>本地开发：打开邮件链接</a>}<button onClick={() => { setPhase("account"); setAccountMode("login"); }}>返回登录</button></div> : <>
-        <div className="auth-copy"><span className="eyebrow">免费公测 · 端到端加密</span><h1>{accountMode === "login" ? "登录 Locket" : accountMode === "register" ? "创建免费账号" : "找回登录密码"}</h1><p>{accountMode === "forgot" ? "我们会发送一次性重置链接。你的保险库主密码不会改变。" : "账号用于同步密文；主密码只在你的浏览器里解密保险库。"}</p></div>
-        {accountMode !== "forgot" && <div className="auth-tabs"><button className={accountMode === "login" ? "active" : ""} onClick={() => { setAccountMode("login"); setAccountPasswordConfirmation(""); setError(""); }}>登录</button><button className={accountMode === "register" ? "active" : ""} onClick={() => { setAccountMode("register"); setError(""); }}>注册</button></div>}
+      {phase === "email-sent" ? <div className="email-sent"><span className="success-mark">✓</span><h1>检查你的邮箱</h1><p>登录链接会在 15 分钟后失效，且只能使用一次。点击后会自动进入 Locket。</p>{emailPreviewUrl && <a href={emailPreviewUrl}>本地开发：打开登录链接</a>}<button onClick={() => { setPhase("account"); setError(""); }}>换一个邮箱</button></div> : <>
+        <div className="auth-copy"><span className="eyebrow">邮箱登录 · 端到端加密</span><h1>登录或创建账号</h1><p>输入邮箱获取一次性登录链接。主密码只在你的浏览器里解密保险库。</p></div>
         <form onSubmit={handleAccount} className="auth-form">
           <label>邮箱<input type="email" required autoComplete="email" value={accountEmail} onChange={(event) => setAccountEmail(event.target.value)} placeholder="you@example.com" /></label>
-          {accountMode !== "forgot" && <label>登录密码<div className="auth-password-input"><input type={showAccountPassword ? "text" : "password"} required minLength={12} maxLength={256} autoComplete={accountMode === "register" ? "new-password" : "current-password"} value={accountPassword} onChange={(event) => setAccountPassword(event.target.value)} placeholder="至少 12 个字符" /><button type="button" aria-label={showAccountPassword ? "隐藏登录密码" : "显示登录密码"} aria-pressed={showAccountPassword} onClick={() => setShowAccountPassword((value) => !value)}>{showAccountPassword ? "隐藏" : "显示"}</button></div></label>}
-          {accountMode === "register" && <label>确认登录密码<div className="auth-password-input"><input type={showAccountPasswordConfirmation ? "text" : "password"} required minLength={12} maxLength={256} autoComplete="new-password" value={accountPasswordConfirmation} onChange={(event) => setAccountPasswordConfirmation(event.target.value)} placeholder="再次输入登录密码" /><button type="button" aria-label={showAccountPasswordConfirmation ? "隐藏确认密码" : "显示确认密码"} aria-pressed={showAccountPasswordConfirmation} onClick={() => setShowAccountPasswordConfirmation((value) => !value)}>{showAccountPasswordConfirmation ? "隐藏" : "显示"}</button></div></label>}
           {error && <p className="form-error">{error}</p>}
-          <button className="primary-button" disabled={busy}>{busy ? "处理中…" : accountMode === "login" ? "登录" : accountMode === "register" ? "创建账号" : "发送重置邮件"}</button>
+          <button className="primary-button" disabled={busy}>{busy ? "正在发送…" : "发送登录链接"}</button>
         </form>
-        <button className="text-button" onClick={() => { setAccountMode(accountMode === "forgot" ? "login" : "forgot"); setError(""); }}>{accountMode === "forgot" ? "返回登录" : "忘记登录密码？"}</button>
       </>}
-    </section><p className="auth-footer">账号密码 ≠ 保险库主密码 · 服务端只保存密文</p></main>;
+    </section><p className="auth-footer">邮箱验证身份 · 主密码只用于本地解密</p></main>;
   }
 
   if (phase === "setup" || phase === "locked" || phase === "recover") {
@@ -405,7 +371,7 @@ export function VaultApp() {
         <button className="primary-button" disabled={busy || !masterPassword}>{busy ? "处理中…" : setup ? "生成恢复密钥" : recovering ? "恢复并更新主密码" : "解锁保险库"}</button>
       </form>
       {!setup && <button className="text-button" onClick={() => { setPhase(recovering ? "locked" : "recover"); setError(""); setMasterPassword(""); setConfirmPassword(""); }}>{recovering ? "返回主密码解锁" : "忘记主密码？使用恢复密钥"}</button>}
-      <div className="security-note"><span>◆</span><p><strong>双层身份保护</strong><br />登录密码保护账号，主密码保护保险库内容。</p></div>
+      <div className="security-note"><span>◆</span><p><strong>身份与密钥分离</strong><br />邮箱验证账号身份，主密码保护保险库内容。</p></div>
       <button className="auth-logout" onClick={() => void logout()}>退出账号</button>
     </section><p className="auth-footer">Argon2id · AES-256-GCM · 零知识密文同步</p></main>;
   }
