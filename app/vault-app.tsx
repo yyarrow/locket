@@ -86,6 +86,9 @@ export function VaultApp() {
   const [accountMode, setAccountMode] = useState<AccountMode>("login");
   const [accountEmail, setAccountEmail] = useState("");
   const [accountPassword, setAccountPassword] = useState("");
+  const [accountPasswordConfirmation, setAccountPasswordConfirmation] = useState("");
+  const [showAccountPassword, setShowAccountPassword] = useState(false);
+  const [showAccountPasswordConfirmation, setShowAccountPasswordConfirmation] = useState(false);
   const [emailPreviewUrl, setEmailPreviewUrl] = useState("");
   const [masterPassword, setMasterPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -202,8 +205,12 @@ export function VaultApp() {
 
   const handleAccount = async (event: FormEvent) => {
     event.preventDefault();
-    setBusy(true);
     setError("");
+    if (accountMode === "register" && accountPassword !== accountPasswordConfirmation) {
+      setError("两次输入的登录密码不一致。");
+      return;
+    }
+    setBusy(true);
     try {
       if (accountMode === "forgot") {
         const response = await requestJson<{ previewUrl?: string }>("/api/auth/forgot", {
@@ -215,6 +222,10 @@ export function VaultApp() {
         const response = await requestJson<{ previewUrl?: string }>("/api/auth/register", {
           method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email: accountEmail, password: accountPassword }),
         });
+        setAccountPassword("");
+        setAccountPasswordConfirmation("");
+        setShowAccountPassword(false);
+        setShowAccountPasswordConfirmation(false);
         setEmailPreviewUrl(response.previewUrl ?? "");
         setPhase("email-sent");
       } else {
@@ -222,6 +233,7 @@ export function VaultApp() {
           method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email: accountEmail, password: accountPassword }),
         });
         setAccountPassword("");
+        setAccountPasswordConfirmation("");
         await boot();
       }
     } catch (cause) {
@@ -367,10 +379,11 @@ export function VaultApp() {
       <div className="brand-row"><div className="brand-mark">L</div><span>Locket</span></div>
       {phase === "email-sent" ? <div className="email-sent"><span className="success-mark">✓</span><h1>检查你的邮箱</h1><p>邮件里的链接会在 1 小时后失效。账号密码重置不会重置保险库主密码。</p>{emailPreviewUrl && <a href={emailPreviewUrl}>本地开发：打开邮件链接</a>}<button onClick={() => { setPhase("account"); setAccountMode("login"); }}>返回登录</button></div> : <>
         <div className="auth-copy"><span className="eyebrow">免费公测 · 端到端加密</span><h1>{accountMode === "login" ? "登录 Locket" : accountMode === "register" ? "创建免费账号" : "找回登录密码"}</h1><p>{accountMode === "forgot" ? "我们会发送一次性重置链接。你的保险库主密码不会改变。" : "账号用于同步密文；主密码只在你的浏览器里解密保险库。"}</p></div>
-        {accountMode !== "forgot" && <div className="auth-tabs"><button className={accountMode === "login" ? "active" : ""} onClick={() => { setAccountMode("login"); setError(""); }}>登录</button><button className={accountMode === "register" ? "active" : ""} onClick={() => { setAccountMode("register"); setError(""); }}>注册</button></div>}
+        {accountMode !== "forgot" && <div className="auth-tabs"><button className={accountMode === "login" ? "active" : ""} onClick={() => { setAccountMode("login"); setAccountPasswordConfirmation(""); setError(""); }}>登录</button><button className={accountMode === "register" ? "active" : ""} onClick={() => { setAccountMode("register"); setError(""); }}>注册</button></div>}
         <form onSubmit={handleAccount} className="auth-form">
           <label>邮箱<input type="email" required autoComplete="email" value={accountEmail} onChange={(event) => setAccountEmail(event.target.value)} placeholder="you@example.com" /></label>
-          {accountMode !== "forgot" && <label>登录密码<input type="password" required minLength={12} autoComplete={accountMode === "register" ? "new-password" : "current-password"} value={accountPassword} onChange={(event) => setAccountPassword(event.target.value)} placeholder="至少 12 个字符" /></label>}
+          {accountMode !== "forgot" && <label>登录密码<div className="auth-password-input"><input type={showAccountPassword ? "text" : "password"} required minLength={12} maxLength={256} autoComplete={accountMode === "register" ? "new-password" : "current-password"} value={accountPassword} onChange={(event) => setAccountPassword(event.target.value)} placeholder="至少 12 个字符" /><button type="button" aria-label={showAccountPassword ? "隐藏登录密码" : "显示登录密码"} aria-pressed={showAccountPassword} onClick={() => setShowAccountPassword((value) => !value)}>{showAccountPassword ? "隐藏" : "显示"}</button></div></label>}
+          {accountMode === "register" && <label>确认登录密码<div className="auth-password-input"><input type={showAccountPasswordConfirmation ? "text" : "password"} required minLength={12} maxLength={256} autoComplete="new-password" value={accountPasswordConfirmation} onChange={(event) => setAccountPasswordConfirmation(event.target.value)} placeholder="再次输入登录密码" /><button type="button" aria-label={showAccountPasswordConfirmation ? "隐藏确认密码" : "显示确认密码"} aria-pressed={showAccountPasswordConfirmation} onClick={() => setShowAccountPasswordConfirmation((value) => !value)}>{showAccountPasswordConfirmation ? "隐藏" : "显示"}</button></div></label>}
           {error && <p className="form-error">{error}</p>}
           <button className="primary-button" disabled={busy}>{busy ? "处理中…" : accountMode === "login" ? "登录" : accountMode === "register" ? "创建账号" : "发送重置邮件"}</button>
         </form>

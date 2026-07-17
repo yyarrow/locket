@@ -73,6 +73,12 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, a:focus-visib
   transition: border-color .15s, box-shadow .15s;
 }
 .auth-form input:focus, .editor input:focus, .editor textarea:focus { border-color: #789180; box-shadow: 0 0 0 3px #52735c15; outline: none; }
+.auth-password-input { position: relative; }
+.auth-password-input input { padding-right: 62px; }
+.auth-password-input button {
+  position: absolute; top: 50%; right: 7px; transform: translateY(-50%); border: 0; border-radius: 7px;
+  background: var(--green-pale); color: var(--green); padding: 7px 9px; font-size: 10px; font-weight: 650; cursor: pointer;
+}
 .form-error { margin: -4px 0; color: var(--danger); font-size: 12px; }
 .auth-tabs { display: grid; grid-template-columns: 1fr 1fr; margin: -8px 0 18px; padding: 3px; border-radius: 10px; background: #f0f0ea; }
 .auth-tabs button { border: 0; border-radius: 8px; background: transparent; padding: 8px; color: var(--muted); font-size: 11px; font-weight: 650; cursor: pointer; }
