@@ -48,3 +48,17 @@ test("client keeps local safety controls without plaintext persistence", async (
   assert.doesNotMatch(source, /localStorage|sessionStorage|indexedDB/);
   assert.doesNotMatch(source, /登录密码|\/api\/auth\/login|\/api\/auth\/register/);
 });
+
+test("TOTP QR images are decoded locally and destructive actions are explicit", async () => {
+  const [app, qrDecoder] = await Promise.all([
+    read("../app/vault-app.tsx"),
+    read("../lib/totp-qr.ts"),
+  ]);
+  assert.match(app, /扫描二维码/);
+  assert.match(app, /className="danger-action"/u);
+  assert.match(app, />删除<\/button>/u);
+  assert.doesNotMatch(app, />•••</u);
+  assert.match(qrDecoder, /jsQR/);
+  assert.match(qrDecoder, /document\.createElement\("canvas"\)/);
+  assert.doesNotMatch(qrDecoder, /fetch\(|XMLHttpRequest|FormData/);
+});

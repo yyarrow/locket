@@ -16,6 +16,7 @@ import {
   parseTotpInput,
   type TotpConfig,
 } from "@/lib/totp";
+import { decodeTotpQrImage } from "@/lib/totp-qr";
 
 type Category = "login" | "card" | "note" | "wifi";
 type VaultItem = {
@@ -144,6 +145,8 @@ export function VaultApp() {
   const [editorOpen, setEditorOpen] = useState(false);
   const [editorError, setEditorError] = useState("");
   const [totpInputRevealed, setTotpInputRevealed] = useState(false);
+  const [totpScanBusy, setTotpScanBusy] = useState(false);
+  const [totpScanStatus, setTotpScanStatus] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState(emptyDraft());
   const [toast, setToast] = useState("");
@@ -152,6 +155,7 @@ export function VaultApp() {
   const pendingSetup = useRef<{ envelope: VaultEnvelope; dataKey: CryptoKey; data: VaultData } | null>(null);
   const lockTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const importRef = useRef<HTMLInputElement>(null);
+  const totpImageRef = useRef<HTMLInputElement>(null);
 
   const loadRemoteVault = useCallback(async () => {
     const response = await requestJson<{ vault: unknown }>("/api/vault");
@@ -346,7 +350,7 @@ export function VaultApp() {
   const selected = data.items.find((item) => item.id === selectedId) ?? filtered[0] ?? null;
   const openNew = () => {
     if (data.items.length >= 500) return setToast("免费版最多保存 500 个条目");
-    setEditingId(null); setDraft({ ...emptyDraft(), password: makePassword() }); setEditorError(""); setTotpInputRevealed(false); setEditorOpen(true);
+    setEditingId(null); setDraft({ ...emptyDraft(), password: makePassword() }); setEditorError(""); setTotpInputRevealed(false); setTotpScanStatus(""); setEditorOpen(true);
   };
   const openEdit = (item: VaultItem) => {
     setEditingId(item.id);
@@ -362,7 +366,29 @@ export function VaultApp() {
     });
     setEditorError("");
     setTotpInputRevealed(false);
+    setTotpScanStatus(item.totp ? "已设置动态验证码" : "");
     setEditorOpen(true);
+  };
+  const scanTotpImage = async (file: File) => {
+    setEditorError("");
+    setTotpScanStatus("");
+    setTotpScanBusy(true);
+    try {
+      const raw = await decodeTotpQrImage(file);
+      const config = parseTotpInput(raw);
+      setDraft((current) => ({
+        ...current,
+        title: current.title || config.issuer || "",
+        username: current.username || config.account || "",
+        totpInput: formatTotpInput(config),
+      }));
+      setTotpInputRevealed(false);
+      setTotpScanStatus(config.issuer ? `已识别 ${config.issuer} 动态验证码` : "二维码已识别");
+    } catch (cause) {
+      setEditorError(cause instanceof Error ? cause.message : "无法识别二维码");
+    } finally {
+      setTotpScanBusy(false);
+    }
   };
   const saveItem = async (event: FormEvent) => {
     event.preventDefault();
@@ -491,7 +517,7 @@ export function VaultApp() {
       <header className="detail-header">
         <div className={`detail-avatar ${selected.category}`}>{selected.title.slice(0, 1).toUpperCase()}</div>
         <div><h2>{selected.title}</h2><p>{categoryMeta[selected.category].label}</p></div>
-        <div className="detail-actions"><button aria-label={selected.favorite ? "取消收藏" : "收藏"} onClick={() => void toggleFavorite(selected)}>{selected.favorite ? "★" : "☆"}</button><button onClick={() => openEdit(selected)}>编辑</button><button className="danger-action" aria-label="删除" onClick={() => void deleteItem(selected)}>•••</button></div>
+        <div className="detail-actions"><button aria-label={selected.favorite ? "取消收藏" : "收藏"} onClick={() => void toggleFavorite(selected)}>{selected.favorite ? "★" : "☆"}</button><button onClick={() => openEdit(selected)}>编辑</button><button className="danger-action" onClick={() => void deleteItem(selected)}>删除</button></div>
       </header>
       <div className="detail-body">
         <div className="field-group"><p className="field-label">登录信息</p><div className="value-row"><span><small>用户名</small><strong>{selected.username || "—"}</strong></span>{selected.username && <button onClick={() => void copy(selected.username, "用户名")}>复制</button>}</div><div className="value-row password-row"><span><small>密码</small><strong>{revealed ? selected.password : "••••••••••••••"}</strong></span><div><button onClick={() => setRevealed((value) => !value)}>{revealed ? "隐藏" : "显示"}</button>{selected.password && <button onClick={() => void copy(selected.password, "密码")}>复制</button>}</div></div></div>
@@ -506,7 +532,35 @@ export function VaultApp() {
       <label>名称<input autoFocus required value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} placeholder="例如：GitHub" /></label>
       <label>用户名<input value={draft.username} onChange={(event) => setDraft({ ...draft, username: event.target.value })} placeholder="邮箱或用户名" /></label>
       <label>密码<div className="password-input"><input value={draft.password} onChange={(event) => setDraft({ ...draft, password: event.target.value })} /><button type="button" onClick={() => setDraft({ ...draft, password: makePassword() })}>重新生成</button></div></label>
-      {draft.category === "login" && <label>动态验证码密钥<div className="password-input"><input type={totpInputRevealed ? "text" : "password"} value={draft.totpInput} onChange={(event) => { setDraft({ ...draft, totpInput: event.target.value }); setEditorError(""); }} placeholder="粘贴 otpauth:// 链接或设置密钥" autoComplete="off" spellCheck={false} /><button type="button" onClick={() => setTotpInputRevealed((value) => !value)}>{totpInputRevealed ? "隐藏" : "显示"}</button></div><small className="field-hint">密钥只会进入端到端加密保险库，验证码在本地生成。</small></label>}
+      {draft.category === "login" && <div className="totp-editor-field">
+        <div className="totp-editor-heading"><span>动态验证码</span><small>二维码仅在此浏览器中解析</small></div>
+        <button
+          type="button"
+          className={`qr-drop-zone ${totpScanBusy ? "busy" : ""}`}
+          disabled={totpScanBusy}
+          onClick={() => totpImageRef.current?.click()}
+          onDragOver={(event) => event.preventDefault()}
+          onDrop={(event) => {
+            event.preventDefault();
+            const file = Array.from(event.dataTransfer.files).find((candidate) => candidate.type.startsWith("image/"));
+            if (file) void scanTotpImage(file); else setEditorError("请拖入二维码图片或截图");
+          }}
+          onPaste={(event) => {
+            const file = Array.from(event.clipboardData.files).find((candidate) => candidate.type.startsWith("image/"));
+            if (file) { event.preventDefault(); void scanTotpImage(file); } else setEditorError("剪贴板中没有图片");
+          }}
+        >
+          <span className="qr-scan-icon">⌗</span>
+          <strong>{totpScanBusy ? "正在本地识别…" : draft.totpInput ? "扫描新二维码以替换" : "扫描二维码"}</strong>
+          <small>选择或拖入截图，也可以聚焦此处后粘贴截图</small>
+        </button>
+        <input ref={totpImageRef} hidden type="file" accept="image/*" onChange={(event) => { const file = event.target.files?.[0]; if (file) void scanTotpImage(file); event.currentTarget.value = ""; }} />
+        {totpScanStatus && <div className="totp-scan-status"><span>✓ {totpScanStatus}</span><button type="button" onClick={() => { setDraft({ ...draft, totpInput: "" }); setTotpScanStatus(""); }}>移除</button></div>}
+        <details className="manual-totp">
+          <summary>手动输入设置密钥</summary>
+          <label>设置密钥或 otpauth 链接<div className="password-input"><input type={totpInputRevealed ? "text" : "password"} value={draft.totpInput} onChange={(event) => { const value = event.target.value; setDraft({ ...draft, totpInput: value }); setTotpScanStatus(value ? "已填写设置密钥" : ""); setEditorError(""); }} placeholder="Base32 设置密钥" autoComplete="off" spellCheck={false} /><button type="button" onClick={() => setTotpInputRevealed((value) => !value)}>{totpInputRevealed ? "隐藏" : "显示"}</button></div></label>
+        </details>
+      </div>}
       <label>网址<input value={draft.url} onChange={(event) => setDraft({ ...draft, url: event.target.value })} placeholder="https://example.com" /></label>
       <label>备注<textarea value={draft.notes} onChange={(event) => setDraft({ ...draft, notes: event.target.value })} placeholder="可选的安全备注" /></label>
       <label className="favorite-check"><input type="checkbox" checked={draft.favorite} onChange={(event) => setDraft({ ...draft, favorite: event.target.checked })} /> 添加到收藏</label>

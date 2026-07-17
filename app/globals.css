@@ -159,6 +159,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, a:focus-visib
 .detail-actions { margin-left: auto; display: flex; align-items: center; gap: 7px; }
 .detail-actions button { height: 34px; padding: 0 12px; border: 1px solid #e2e3dc; border-radius: 8px; background: white; color: #6f726a; font-size: 11px; cursor: pointer; }
 .detail-actions button:hover { border-color: #bdc9bf; color: var(--green); }
+.detail-actions .danger-action { border-color: #ead7d3; background: #fff9f8; color: var(--danger); }
 .detail-actions .danger-action:hover { border-color: #e1bbb5; color: var(--danger); }
 .detail-body { max-width: 690px; padding: 32px 36px 60px; }
 .field-group { margin-bottom: 28px; }
@@ -206,6 +207,23 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, a:focus-visib
 .password-input input { padding-right: 97px; font-family: var(--font-geist-mono), monospace; }
 .password-input button { position: absolute; right: 5px; top: 5px; bottom: 5px; border: 0; border-radius: 6px; background: #eef2ed; color: var(--green); font-size: 9px; font-weight: 650; cursor: pointer; }
 .field-hint { color: #92968e; font-size: 9px; font-weight: 450; line-height: 1.55; }
+.totp-editor-field { display: grid; gap: 10px; padding: 14px; border: 1px solid #dde3dc; border-radius: 11px; background: #f7faf7; }
+.totp-editor-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; color: #555a51; font-size: 12px; font-weight: 650; }
+.totp-editor-heading small { color: #92978f; font-size: 9px; font-weight: 450; }
+.qr-drop-zone { width: 100%; min-height: 105px; display: grid; place-items: center; align-content: center; gap: 5px; border: 1px dashed #aebcaf; border-radius: 10px; background: white; color: var(--green); cursor: pointer; transition: border-color .15s, background .15s; }
+.qr-drop-zone:hover, .qr-drop-zone:focus-visible { border-color: #66806d; background: #f1f6f1; }
+.qr-drop-zone.busy { opacity: .7; cursor: wait; }
+.qr-scan-icon { width: 29px; height: 29px; display: grid; place-items: center; border-radius: 8px; background: var(--green-pale); font-size: 18px; }
+.qr-drop-zone strong { font-size: 11px; font-weight: 700; }
+.qr-drop-zone small { color: #8c928a; font-size: 9px; font-weight: 450; }
+.totp-scan-status { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 10px; border-radius: 8px; background: #e9f1ea; color: var(--green); font-size: 10px; font-weight: 650; }
+.totp-scan-status button { border: 0; background: transparent; color: var(--danger); font-size: 9px; cursor: pointer; }
+.manual-totp { padding-top: 2px; }
+.manual-totp summary { color: #687168; font-size: 10px; font-weight: 650; cursor: pointer; list-style: none; }
+.manual-totp summary::-webkit-details-marker { display: none; }
+.manual-totp summary::after { content: "＋"; float: right; color: #869087; }
+.manual-totp[open] summary::after { content: "−"; }
+.manual-totp label { margin-top: 11px; display: grid; gap: 7px; color: #666c63; font-size: 10px; font-weight: 600; }
 .editor .favorite-check { display: flex; align-items: center; gap: 8px; }
 .editor .favorite-check input { width: 15px; height: 15px; accent-color: var(--green); }
 .editor footer { margin-top: 6px; padding-top: 19px; border-top: 1px solid var(--line); display: flex; justify-content: flex-end; gap: 9px; }
