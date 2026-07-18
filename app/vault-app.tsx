@@ -350,12 +350,14 @@ export function VaultApp() {
 
   const selected = data.items.find((item) => item.id === selectedId) ?? filtered[0] ?? null;
   const editingItem = editingId ? data.items.find((item) => item.id === editingId) : null;
+  const contextualCategory = category === "all" || category === "favorites" ? null : category;
   const isTotpDraft = draft.category === "totp";
   const hasLegacyTotp = draft.category === "login" && editingItem?.category === "login" && Boolean(editingItem.totp);
   const showTotpEditor = isTotpDraft || hasLegacyTotp;
   const openNew = () => {
     if (data.items.length >= 500) return setToast("免费版最多保存 500 个条目");
-    setEditingId(null); setDraft({ ...emptyDraft(), password: makePassword() }); setEditorError(""); setTotpInputRevealed(false); setTotpScanStatus(""); setEditorOpen(true);
+    const itemCategory = contextualCategory ?? "login";
+    setEditingId(null); setDraft({ ...emptyDraft(), category: itemCategory, password: itemCategory === "totp" ? "" : makePassword() }); setEditorError(""); setTotpInputRevealed(false); setTotpScanStatus(""); setEditorOpen(true);
   };
   const openEdit = (item: VaultItem) => {
     setEditingId(item.id);
@@ -537,7 +539,7 @@ export function VaultApp() {
       </div>
     </> : <div className="detail-empty"><div className="brand-mark">L</div><h2>选择一个条目</h2><p>查看、复制或编辑保存在保险库中的信息。</p></div>}</section>
     {editorOpen && <div className="modal-backdrop" role="presentation" onMouseDown={() => setEditorOpen(false)}><section className="editor" role="dialog" aria-modal="true" aria-labelledby="editor-title" onMouseDown={(event) => event.stopPropagation()}><header><div><span className="eyebrow">端到端加密条目</span><h2 id="editor-title">{editingId ? "编辑条目" : "新建条目"}</h2></div><button aria-label="关闭" onClick={() => setEditorOpen(false)}>×</button></header><form onSubmit={saveItem}>
-      <div className="category-picker">{(Object.keys(categoryMeta) as Category[]).map((key) => <button type="button" key={key} className={draft.category === key ? "active" : ""} onClick={() => setDraft({ ...draft, category: key })}><span>{categoryMeta[key].glyph}</span>{categoryMeta[key].label}</button>)}</div>
+      {(editingId || !contextualCategory) && <div className="category-picker">{(Object.keys(categoryMeta) as Category[]).map((key) => <button type="button" key={key} className={draft.category === key ? "active" : ""} onClick={() => setDraft({ ...draft, category: key })}><span>{categoryMeta[key].glyph}</span>{categoryMeta[key].label}</button>)}</div>}
       <label>名称<input autoFocus required value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} placeholder="例如：GitHub" /></label>
       <label>{isTotpDraft ? "账号" : "用户名"}<input value={draft.username} onChange={(event) => setDraft({ ...draft, username: event.target.value })} placeholder={isTotpDraft ? "邮箱或账号名称" : "邮箱或用户名"} /></label>
       {!isTotpDraft && <label>密码<div className="password-input"><input value={draft.password} onChange={(event) => setDraft({ ...draft, password: event.target.value })} /><button type="button" onClick={() => setDraft({ ...draft, password: makePassword() })}>重新生成</button></div></label>}
