@@ -137,6 +137,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, a:focus-visib
 .item-row.selected { background: #e9efe9; border-color: #dae5dc; }
 .item-avatar, .detail-avatar { flex: 0 0 auto; display: grid; place-items: center; border-radius: 10px; color: white; background: #40594a; font-family: Georgia, serif; font-weight: 700; }
 .item-avatar { width: 39px; height: 39px; font-size: 16px; }
+.item-avatar.totp, .detail-avatar.totp { background: #4f6957; }
 .item-avatar.card, .detail-avatar.card { background: #7f644a; }
 .item-avatar.note, .detail-avatar.note { background: #68727c; }
 .item-avatar.wifi, .detail-avatar.wifi { background: #4a6b76; }
@@ -198,7 +199,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, a:focus-visib
 .editor header h2 { margin: 4px 0 0; font-family: Georgia, "Songti SC", serif; font-size: 27px; font-weight: 500; }
 .editor header > button { border: 0; background: transparent; color: #777a71; font-size: 25px; cursor: pointer; }
 .editor form { padding: 23px 29px 32px; display: grid; gap: 15px; }
-.category-picker { display: grid; grid-template-columns: repeat(4, 1fr); gap: 7px; margin-bottom: 5px; }
+.category-picker { display: grid; grid-template-columns: repeat(5, 1fr); gap: 7px; margin-bottom: 5px; }
 .category-picker button { display: grid; justify-items: center; gap: 5px; padding: 9px 5px; border: 1px solid #e0e2da; border-radius: 9px; background: white; color: #777a71; font-size: 9px; cursor: pointer; }
 .category-picker button span { font-size: 16px; }
 .category-picker button.active { border-color: #728878; background: var(--green-pale); color: var(--green); }

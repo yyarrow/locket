@@ -54,6 +54,11 @@ test("TOTP QR images are decoded locally and destructive actions are explicit", 
     read("../app/vault-app.tsx"),
     read("../lib/totp-qr.ts"),
   ]);
+  assert.match(app, /type Category = "login" \| "totp"/u);
+  assert.match(app, /totp: \{ label: "TOTP"/u);
+  assert.match(app, /password: isTotpDraft \? "" : draft\.password/u);
+  assert.match(app, /!isTotpDraft && <label>密码/u);
+  assert.match(app, /showTotpEditor &&/u);
   assert.match(app, /扫描二维码/);
   assert.match(app, /className="danger-action"/u);
   assert.match(app, />删除<\/button>/u);
