@@ -376,7 +376,7 @@ export function VaultApp() {
     setTotpScanStatus(item.totp ? "已设置动态验证码" : "");
     setEditorOpen(true);
   };
-  const scanTotpImage = async (file: File) => {
+  const scanTotpImage = useCallback(async (file: File) => {
     setEditorError("");
     setTotpScanStatus("");
     setTotpScanBusy(true);
@@ -395,6 +395,36 @@ export function VaultApp() {
       setEditorError(cause instanceof Error ? cause.message : "无法识别二维码");
     } finally {
       setTotpScanBusy(false);
+    }
+  }, []);
+  useEffect(() => {
+    if (!editorOpen || !showTotpEditor) return;
+    const pasteImage = (event: ClipboardEvent) => {
+      const file = Array.from(event.clipboardData?.items ?? [])
+        .find((item) => item.type.startsWith("image/"))?.getAsFile()
+        ?? Array.from(event.clipboardData?.files ?? []).find((item) => item.type.startsWith("image/"));
+      if (!file) return;
+      event.preventDefault();
+      void scanTotpImage(file);
+    };
+    window.addEventListener("paste", pasteImage);
+    return () => window.removeEventListener("paste", pasteImage);
+  }, [editorOpen, scanTotpImage, showTotpEditor]);
+  const pasteTotpImage = async () => {
+    setEditorError("");
+    try {
+      if (!navigator.clipboard?.read) throw new Error("clipboard-read-unavailable");
+      const clipboardItems = await navigator.clipboard.read();
+      for (const item of clipboardItems) {
+        const imageType = item.types.find((type) => type.startsWith("image/"));
+        if (!imageType) continue;
+        const blob = await item.getType(imageType);
+        await scanTotpImage(new File([blob], "clipboard-qr.png", { type: blob.type || imageType }));
+        return;
+      }
+      setEditorError("剪贴板中没有图片，请先截取二维码");
+    } catch {
+      setEditorError("无法读取剪贴板，请在此窗口直接按 ⌘/Ctrl + V");
     }
   };
   const saveItem = async (event: FormEvent) => {
@@ -556,16 +586,13 @@ export function VaultApp() {
             const file = Array.from(event.dataTransfer.files).find((candidate) => candidate.type.startsWith("image/"));
             if (file) void scanTotpImage(file); else setEditorError("请拖入二维码图片或截图");
           }}
-          onPaste={(event) => {
-            const file = Array.from(event.clipboardData.files).find((candidate) => candidate.type.startsWith("image/"));
-            if (file) { event.preventDefault(); void scanTotpImage(file); } else setEditorError("剪贴板中没有图片");
-          }}
         >
           <span className="qr-scan-icon">⌗</span>
           <strong>{totpScanBusy ? "正在本地识别…" : draft.totpInput ? "扫描新二维码以替换" : "扫描二维码"}</strong>
-          <small>选择或拖入截图，也可以聚焦此处后粘贴截图</small>
+          <small>选择或拖入截图，也可以在此窗口直接粘贴</small>
         </button>
         <input ref={totpImageRef} hidden type="file" accept="image/*" onChange={(event) => { const file = event.target.files?.[0]; if (file) void scanTotpImage(file); event.currentTarget.value = ""; }} />
+        <div className="qr-clipboard-row"><span>截图复制后无需保存到本地</span><button type="button" disabled={totpScanBusy} onClick={() => void pasteTotpImage()}>粘贴二维码截图</button></div>
         {totpScanStatus && <div className="totp-scan-status"><span>✓ {totpScanStatus}</span><button type="button" onClick={() => { setDraft({ ...draft, totpInput: "" }); setTotpScanStatus(""); }}>移除</button></div>}
         <details className="manual-totp">
           <summary>手动输入设置密钥</summary>

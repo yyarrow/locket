@@ -59,6 +59,9 @@ test("TOTP QR images are decoded locally and destructive actions are explicit", 
   assert.match(app, /password: isTotpDraft \? "" : draft\.password/u);
   assert.match(app, /!isTotpDraft && <label>密码/u);
   assert.match(app, /showTotpEditor &&/u);
+  assert.match(app, /window\.addEventListener\("paste", pasteImage\)/u);
+  assert.match(app, /navigator\.clipboard\?\.read/u);
+  assert.match(app, />粘贴二维码截图<\/button>/u);
   assert.match(app, /const itemCategory = contextualCategory \?\? "login"/u);
   assert.match(app, /itemCategory === "totp" \? "" : makePassword\(\)/u);
   assert.match(app, /\(editingId \|\| !contextualCategory\) && <div className="category-picker"/u);

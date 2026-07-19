@@ -217,6 +217,9 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, a:focus-visib
 .qr-scan-icon { width: 29px; height: 29px; display: grid; place-items: center; border-radius: 8px; background: var(--green-pale); font-size: 18px; }
 .qr-drop-zone strong { font-size: 11px; font-weight: 700; }
 .qr-drop-zone small { color: #8c928a; font-size: 9px; font-weight: 450; }
+.qr-clipboard-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; color: #7e857c; font-size: 9px; }
+.qr-clipboard-row button { flex: 0 0 auto; border: 1px solid #b8c7ba; border-radius: 7px; padding: 7px 10px; background: var(--green-pale); color: var(--green); font-size: 9px; font-weight: 700; cursor: pointer; }
+.qr-clipboard-row button:disabled { opacity: .6; cursor: wait; }
 .totp-scan-status { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 10px; border-radius: 8px; background: #e9f1ea; color: var(--green); font-size: 10px; font-weight: 650; }
 .totp-scan-status button { border: 0; background: transparent; color: var(--danger); font-size: 9px; cursor: pointer; }
 .manual-totp { padding-top: 2px; }
