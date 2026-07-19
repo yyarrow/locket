@@ -56,14 +56,14 @@ test("TOTP QR images are decoded locally and destructive actions are explicit", 
   ]);
   assert.match(app, /type Category = "login" \| "totp"/u);
   assert.match(app, /totp: \{ label: "TOTP"/u);
-  assert.match(app, /password: isTotpDraft \? "" : draft\.password/u);
-  assert.match(app, /!isTotpDraft && <label>密码/u);
+  assert.match(app, /password: isTotpDraft \|\| emptyNewNoteCredentials \? "" : draft\.password/u);
+  assert.match(app, /!isTotpDraft && !isNoteDraft && <label>密码/u);
   assert.match(app, /showTotpEditor &&/u);
   assert.match(app, /window\.addEventListener\("paste", pasteImage\)/u);
   assert.match(app, /navigator\.clipboard\?\.read/u);
   assert.match(app, />粘贴二维码截图<\/button>/u);
   assert.match(app, /const itemCategory = contextualCategory \?\? "login"/u);
-  assert.match(app, /itemCategory === "totp" \? "" : makePassword\(\)/u);
+  assert.match(app, /itemCategory === "totp" \|\| itemCategory === "note" \? "" : makePassword\(\)/u);
   assert.match(app, /\(editingId \|\| !contextualCategory\) && <div className="category-picker"/u);
   assert.match(app, /扫描二维码/);
   assert.match(app, /className="danger-action"/u);
@@ -72,4 +72,17 @@ test("TOTP QR images are decoded locally and destructive actions are explicit", 
   assert.match(qrDecoder, /jsQR/);
   assert.match(qrDecoder, /document\.createElement\("canvas"\)/);
   assert.doesNotMatch(qrDecoder, /fetch\(|XMLHttpRequest|FormData/);
+});
+
+test("secure notes use bounded Markdown without credential fields or remote images", async () => {
+  const app = await read("../app/vault-app.tsx");
+  assert.match(app, /import Markdown from "react-markdown"/u);
+  assert.match(app, /<Markdown\s+skipHtml/u);
+  assert.match(app, /img: \(\{ alt \}\) => <span className="markdown-image-disabled"/u);
+  assert.match(app, /const isNoteDraft = draft\.category === "note"/u);
+  assert.match(app, /!isNoteDraft && <label>\{isTotpDraft \? "账号" : "用户名"\}/u);
+  assert.match(app, /安全笔记内容不能超过 256 KB/u);
+  assert.match(app, /isNoteDraft \? "标题" : "名称"/u);
+  assert.match(app, /Markdown 纯文本 · 不支持 HTML、外部图片或附件/u);
+  assert.match(app, /安全笔记显示模式/u);
 });
