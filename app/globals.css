@@ -137,6 +137,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, a:focus-visib
 .item-row.selected { background: #e9efe9; border-color: #dae5dc; }
 .item-avatar, .detail-avatar { flex: 0 0 auto; display: grid; place-items: center; border-radius: 10px; color: white; background: #40594a; font-family: Georgia, serif; font-weight: 700; }
 .item-avatar { width: 39px; height: 39px; font-size: 16px; }
+.item-avatar.token, .detail-avatar.token { background: #5f526f; }
 .item-avatar.totp, .detail-avatar.totp { background: #4f6957; }
 .item-avatar.card, .detail-avatar.card { background: #7f644a; }
 .item-avatar.note, .detail-avatar.note { background: #68727c; }
@@ -215,7 +216,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, a:focus-visib
 .editor header h2 { margin: 4px 0 0; font-family: Georgia, "Songti SC", serif; font-size: 27px; font-weight: 500; }
 .editor header > button { border: 0; background: transparent; color: #777a71; font-size: 25px; cursor: pointer; }
 .editor form { padding: 23px 29px 32px; display: grid; gap: 15px; }
-.category-picker { display: grid; grid-template-columns: repeat(5, 1fr); gap: 7px; margin-bottom: 5px; }
+.category-picker { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; margin-bottom: 5px; }
 .category-picker button { display: grid; justify-items: center; gap: 5px; padding: 9px 5px; border: 1px solid #e0e2da; border-radius: 9px; background: white; color: #777a71; font-size: 9px; cursor: pointer; }
 .category-picker button span { font-size: 16px; }
 .category-picker button.active { border-color: #728878; background: var(--green-pale); color: var(--green); }
@@ -230,6 +231,9 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, a:focus-visib
 .password-input { position: relative; }
 .password-input input { padding-right: 97px; font-family: var(--font-geist-mono), monospace; }
 .password-input button { position: absolute; right: 5px; top: 5px; bottom: 5px; border: 0; border-radius: 6px; background: #eef2ed; color: var(--green); font-size: 9px; font-weight: 650; cursor: pointer; }
+.token-input { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 6px; }
+.token-input input { min-width: 0; font-family: var(--font-geist-mono), monospace; }
+.token-input button { border: 0; border-radius: 7px; padding: 0 10px; background: #eef2ed; color: var(--green); font-size: 9px; font-weight: 650; cursor: pointer; }
 .field-hint { color: #92968e; font-size: 9px; font-weight: 450; line-height: 1.55; }
 .totp-editor-field { display: grid; gap: 10px; padding: 14px; border: 1px solid #dde3dc; border-radius: 11px; background: #f7faf7; }
 .totp-editor-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; color: #555a51; font-size: 12px; font-weight: 650; }

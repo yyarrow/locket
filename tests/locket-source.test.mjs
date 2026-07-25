@@ -54,7 +54,7 @@ test("TOTP QR images are decoded locally and destructive actions are explicit", 
     read("../app/vault-app.tsx"),
     read("../lib/totp-qr.ts"),
   ]);
-  assert.match(app, /type Category = "login" \| "totp"/u);
+  assert.match(app, /type Category = "login" \| "token" \| "totp"/u);
   assert.match(app, /totp: \{ label: "TOTP"/u);
   assert.match(app, /password: isTotpDraft \|\| emptyNewNoteCredentials \? "" : draft\.password/u);
   assert.match(app, /!isTotpDraft && !isNoteDraft && <label>密码/u);
@@ -63,7 +63,7 @@ test("TOTP QR images are decoded locally and destructive actions are explicit", 
   assert.match(app, /navigator\.clipboard\?\.read/u);
   assert.match(app, />粘贴二维码截图<\/button>/u);
   assert.match(app, /const itemCategory = contextualCategory \?\? "login"/u);
-  assert.match(app, /itemCategory === "totp" \|\| itemCategory === "note" \? "" : makePassword\(\)/u);
+  assert.match(app, /itemCategory === "token" \? makeToken\(\) : itemCategory === "totp" \|\| itemCategory === "note" \? "" : makePassword\(\)/u);
   assert.match(app, /\(editingId \|\| !contextualCategory\) && <div className="category-picker"/u);
   assert.match(app, /扫描二维码/);
   assert.match(app, /className="danger-action"/u);
@@ -80,9 +80,21 @@ test("secure notes use bounded Markdown without credential fields or remote imag
   assert.match(app, /<Markdown\s+skipHtml/u);
   assert.match(app, /img: \(\{ alt \}\) => <span className="markdown-image-disabled"/u);
   assert.match(app, /const isNoteDraft = draft\.category === "note"/u);
-  assert.match(app, /!isNoteDraft && <label>\{isTotpDraft \? "账号" : "用户名"\}/u);
+  assert.match(app, /!isNoteDraft && !isTokenDraft && <label>\{isTotpDraft \? "账号" : "用户名"\}/u);
   assert.match(app, /安全笔记内容不能超过 256 KB/u);
   assert.match(app, /isNoteDraft \? "标题" : "名称"/u);
   assert.match(app, /Markdown 纯文本 · 不支持 HTML、外部图片或附件/u);
   assert.match(app, /安全笔记显示模式/u);
+});
+
+test("API tokens are standalone encrypted entries with dedicated secret controls", async () => {
+  const app = await read("../app/vault-app.tsx");
+  assert.match(app, /token: \{ label: "API Token"/u);
+  assert.match(app, /const isTokenDraft = draft\.category === "token"/u);
+  assert.match(app, /crypto\.getRandomValues\(new Uint8Array\(32\)\)/u);
+  assert.match(app, /username: isTokenDraft \|\| emptyNewNoteCredentials \? "" : draft\.username/u);
+  assert.match(app, /type=\{tokenInputRevealed \? "text" : "password"\}/u);
+  assert.match(app, />随机生成<\/button>/u);
+  assert.match(app, /void copy\(selected\.password, "Token"\)/u);
+  assert.match(app, /selected\.category === "token" \? "API 地址" : "网站"/u);
 });

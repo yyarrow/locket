@@ -19,7 +19,7 @@ import {
 } from "@/lib/totp";
 import { decodeTotpQrImage } from "@/lib/totp-qr";
 
-type Category = "login" | "totp" | "card" | "note" | "wifi";
+type Category = "login" | "token" | "totp" | "card" | "note" | "wifi";
 type VaultItem = {
   id: string;
   title: string;
@@ -39,6 +39,7 @@ type Phase = "loading" | "account" | "email-sent" | "setup" | "recovery-save" | 
 const AUTO_LOCK_MS = 5 * 60 * 1000;
 const categoryMeta: Record<Category, { label: string; glyph: string }> = {
   login: { label: "登录", glyph: "↗" },
+  token: { label: "API Token", glyph: "{ }" },
   totp: { label: "TOTP", glyph: "◷" },
   card: { label: "银行卡", glyph: "▤" },
   note: { label: "安全笔记", glyph: "≡" },
@@ -61,6 +62,14 @@ function makePassword(length = 20) {
     [output[index], output[swap]] = [output[swap], output[index]];
   }
   return output.join("");
+}
+
+function makeToken() {
+  const bytes = crypto.getRandomValues(new Uint8Array(32));
+  return btoa(String.fromCharCode(...bytes))
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/g, "");
 }
 
 function TotpValue({ config, onCopy }: {
@@ -157,6 +166,7 @@ export function VaultApp() {
   const [revealed, setRevealed] = useState(false);
   const [editorOpen, setEditorOpen] = useState(false);
   const [editorError, setEditorError] = useState("");
+  const [tokenInputRevealed, setTokenInputRevealed] = useState(false);
   const [totpInputRevealed, setTotpInputRevealed] = useState(false);
   const [totpScanBusy, setTotpScanBusy] = useState(false);
   const [totpScanStatus, setTotpScanStatus] = useState("");
@@ -364,6 +374,7 @@ export function VaultApp() {
   const selected = data.items.find((item) => item.id === selectedId) ?? filtered[0] ?? null;
   const editingItem = editingId ? data.items.find((item) => item.id === editingId) : null;
   const contextualCategory = category === "all" || category === "favorites" ? null : category;
+  const isTokenDraft = draft.category === "token";
   const isTotpDraft = draft.category === "totp";
   const isNoteDraft = draft.category === "note";
   const hasLegacyTotp = draft.category === "login" && editingItem?.category === "login" && Boolean(editingItem.totp);
@@ -371,7 +382,7 @@ export function VaultApp() {
   const openNew = () => {
     if (data.items.length >= 500) return setToast("免费版最多保存 500 个条目");
     const itemCategory = contextualCategory ?? "login";
-    setEditingId(null); setDraft({ ...emptyDraft(), category: itemCategory, password: itemCategory === "totp" || itemCategory === "note" ? "" : makePassword() }); setEditorError(""); setTotpInputRevealed(false); setTotpScanStatus(""); setNotePreview(false); setEditorOpen(true);
+    setEditingId(null); setDraft({ ...emptyDraft(), category: itemCategory, password: itemCategory === "token" ? makeToken() : itemCategory === "totp" || itemCategory === "note" ? "" : makePassword() }); setEditorError(""); setTokenInputRevealed(false); setTotpInputRevealed(false); setTotpScanStatus(""); setNotePreview(false); setEditorOpen(true);
   };
   const openEdit = (item: VaultItem) => {
     setEditingId(item.id);
@@ -386,6 +397,7 @@ export function VaultApp() {
       totpInput: item.totp ? formatTotpInput(item.totp) : "",
     });
     setEditorError("");
+    setTokenInputRevealed(false);
     setTotpInputRevealed(false);
     setTotpScanStatus(item.totp ? "已设置动态验证码" : "");
     setNotePreview(false);
@@ -464,7 +476,7 @@ export function VaultApp() {
     const item: VaultItem = {
       id: editingId ?? crypto.randomUUID(),
       title: draft.title.trim(),
-      username: emptyNewNoteCredentials ? "" : draft.username,
+      username: isTokenDraft || emptyNewNoteCredentials ? "" : draft.username,
       password: isTotpDraft || emptyNewNoteCredentials ? "" : draft.password,
       url: isTotpDraft || emptyNewNoteCredentials ? "" : draft.url,
       notes: draft.notes,
@@ -581,18 +593,18 @@ export function VaultApp() {
         <div className="detail-actions"><button aria-label={selected.favorite ? "取消收藏" : "收藏"} onClick={() => void toggleFavorite(selected)}>{selected.favorite ? "★" : "☆"}</button><button onClick={() => openEdit(selected)}>编辑</button><button className="danger-action" onClick={() => void deleteItem(selected)}>删除</button></div>
       </header>
       <div className="detail-body">
-        {selected.category === "note" ? null : selected.category === "totp" ? <div className="field-group"><p className="field-label">验证账号</p><div className="value-row"><span><small>账号</small><strong>{selected.username || "—"}</strong></span>{selected.username && <button onClick={() => void copy(selected.username, "账号")}>复制</button>}</div></div> : <div className="field-group"><p className="field-label">登录信息</p><div className="value-row"><span><small>用户名</small><strong>{selected.username || "—"}</strong></span>{selected.username && <button onClick={() => void copy(selected.username, "用户名")}>复制</button>}</div><div className="value-row password-row"><span><small>密码</small><strong>{revealed ? selected.password : "••••••••••••••"}</strong></span><div><button onClick={() => setRevealed((value) => !value)}>{revealed ? "隐藏" : "显示"}</button>{selected.password && <button onClick={() => void copy(selected.password, "密码")}>复制</button>}</div></div></div>}
+        {selected.category === "note" ? null : selected.category === "totp" ? <div className="field-group"><p className="field-label">验证账号</p><div className="value-row"><span><small>账号</small><strong>{selected.username || "—"}</strong></span>{selected.username && <button onClick={() => void copy(selected.username, "账号")}>复制</button>}</div></div> : selected.category === "token" ? <div className="field-group"><p className="field-label">API 凭据</p><div className="value-row password-row"><span><small>Token</small><strong>{revealed ? selected.password : "••••••••••••••"}</strong></span><div><button onClick={() => setRevealed((value) => !value)}>{revealed ? "隐藏" : "显示"}</button>{selected.password && <button onClick={() => void copy(selected.password, "Token")}>复制</button>}</div></div></div> : <div className="field-group"><p className="field-label">登录信息</p><div className="value-row"><span><small>用户名</small><strong>{selected.username || "—"}</strong></span>{selected.username && <button onClick={() => void copy(selected.username, "用户名")}>复制</button>}</div><div className="value-row password-row"><span><small>密码</small><strong>{revealed ? selected.password : "••••••••••••••"}</strong></span><div><button onClick={() => setRevealed((value) => !value)}>{revealed ? "隐藏" : "显示"}</button>{selected.password && <button onClick={() => void copy(selected.password, "密码")}>复制</button>}</div></div></div>}
         {selected.totp && <div className="field-group"><p className="field-label">动态验证码</p><TotpValue config={selected.totp} onCopy={copy} /></div>}
-        {selected.category !== "note" && selected.url && <div className="field-group"><p className="field-label">网站</p><div className="value-row"><a href={selected.url.startsWith("http") ? selected.url : `https://${selected.url}`} target="_blank" rel="noreferrer">{selected.url} <span>↗</span></a><button onClick={() => void copy(selected.url, "网址")}>复制</button></div></div>}
+        {selected.category !== "note" && selected.url && <div className="field-group"><p className="field-label">{selected.category === "token" ? "API 地址" : "网站"}</p><div className="value-row"><a href={selected.url.startsWith("http") ? selected.url : `https://${selected.url}`} target="_blank" rel="noreferrer">{selected.url} <span>↗</span></a><button onClick={() => void copy(selected.url, selected.category === "token" ? "API 地址" : "网址")}>复制</button></div></div>}
         {selected.category === "note" ? <div className="field-group"><p className="field-label">内容</p><MarkdownContent value={selected.notes} /></div> : selected.notes && <div className="field-group"><p className="field-label">备注</p><p className="notes-value">{selected.notes}</p></div>}
         <p className="updated-time">上次更新于 {new Date(selected.updatedAt).toLocaleString("zh-CN")}</p>
       </div>
     </> : <div className="detail-empty"><div className="brand-mark">L</div><h2>选择一个条目</h2><p>查看、复制或编辑保存在保险库中的信息。</p></div>}</section>
     {editorOpen && <div className="modal-backdrop" role="presentation" onMouseDown={() => setEditorOpen(false)}><section className="editor" role="dialog" aria-modal="true" aria-labelledby="editor-title" onMouseDown={(event) => event.stopPropagation()}><header><div><span className="eyebrow">端到端加密条目</span><h2 id="editor-title">{editingId ? "编辑条目" : "新建条目"}</h2></div><button aria-label="关闭" onClick={() => setEditorOpen(false)}>×</button></header><form onSubmit={saveItem}>
-      {(editingId || !contextualCategory) && <div className="category-picker">{(Object.keys(categoryMeta) as Category[]).map((key) => <button type="button" key={key} className={draft.category === key ? "active" : ""} onClick={() => setDraft({ ...draft, category: key })}><span>{categoryMeta[key].glyph}</span>{categoryMeta[key].label}</button>)}</div>}
+      {(editingId || !contextualCategory) && <div className="category-picker">{(Object.keys(categoryMeta) as Category[]).map((key) => <button type="button" key={key} className={draft.category === key ? "active" : ""} onClick={() => setDraft((current) => ({ ...current, category: key, ...(key === "token" && current.category !== "token" ? { username: "", password: makeToken() } : {}) }))}><span>{categoryMeta[key].glyph}</span>{categoryMeta[key].label}</button>)}</div>}
       <label>{isNoteDraft ? "标题" : "名称"}<input autoFocus required value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} placeholder={isNoteDraft ? "例如：服务器恢复信息" : "例如：GitHub"} /></label>
-      {!isNoteDraft && <label>{isTotpDraft ? "账号" : "用户名"}<input value={draft.username} onChange={(event) => setDraft({ ...draft, username: event.target.value })} placeholder={isTotpDraft ? "邮箱或账号名称" : "邮箱或用户名"} /></label>}
-      {!isTotpDraft && !isNoteDraft && <label>密码<div className="password-input"><input value={draft.password} onChange={(event) => setDraft({ ...draft, password: event.target.value })} /><button type="button" onClick={() => setDraft({ ...draft, password: makePassword() })}>重新生成</button></div></label>}
+      {!isNoteDraft && !isTokenDraft && <label>{isTotpDraft ? "账号" : "用户名"}<input value={draft.username} onChange={(event) => setDraft({ ...draft, username: event.target.value })} placeholder={isTotpDraft ? "邮箱或账号名称" : "邮箱或用户名"} /></label>}
+      {isTokenDraft ? <label>Token<div className="token-input"><input required type={tokenInputRevealed ? "text" : "password"} value={draft.password} onChange={(event) => setDraft({ ...draft, password: event.target.value })} placeholder="粘贴服务商签发的 Token" autoComplete="off" spellCheck={false} /><button type="button" onClick={() => setTokenInputRevealed((value) => !value)}>{tokenInputRevealed ? "隐藏" : "显示"}</button><button type="button" onClick={() => setDraft({ ...draft, password: makeToken() })}>随机生成</button></div><small className="field-hint">通常请粘贴服务商签发的 Token；随机生成适用于你自己控制的服务。</small></label> : !isTotpDraft && !isNoteDraft && <label>密码<div className="password-input"><input value={draft.password} onChange={(event) => setDraft({ ...draft, password: event.target.value })} /><button type="button" onClick={() => setDraft({ ...draft, password: makePassword() })}>重新生成</button></div></label>}
       {showTotpEditor && <div className="totp-editor-field">
         <div className="totp-editor-heading"><span>动态验证码</span><small>二维码仅在此浏览器中解析</small></div>
         <button
@@ -619,7 +631,7 @@ export function VaultApp() {
           <label>设置密钥或 otpauth 链接<div className="password-input"><input type={totpInputRevealed ? "text" : "password"} value={draft.totpInput} onChange={(event) => { const value = event.target.value; setDraft({ ...draft, totpInput: value }); setTotpScanStatus(value ? "已填写设置密钥" : ""); setEditorError(""); }} placeholder="Base32 设置密钥" autoComplete="off" spellCheck={false} /><button type="button" onClick={() => setTotpInputRevealed((value) => !value)}>{totpInputRevealed ? "隐藏" : "显示"}</button></div></label>
         </details>
       </div>}
-      {!isTotpDraft && !isNoteDraft && <label>网址<input value={draft.url} onChange={(event) => setDraft({ ...draft, url: event.target.value })} placeholder="https://example.com" /></label>}
+      {!isTotpDraft && !isNoteDraft && <label>{isTokenDraft ? "API 地址" : "网址"}<input value={draft.url} onChange={(event) => setDraft({ ...draft, url: event.target.value })} placeholder={isTokenDraft ? "https://api.example.com" : "https://example.com"} /></label>}
       {isNoteDraft ? <div className="markdown-editor-field">
         <div className="markdown-editor-heading"><span>内容</span><div role="group" aria-label="安全笔记显示模式"><button type="button" className={!notePreview ? "active" : ""} onClick={() => setNotePreview(false)}>编辑</button><button type="button" className={notePreview ? "active" : ""} onClick={() => setNotePreview(true)}>预览</button></div></div>
         {notePreview ? <MarkdownContent value={draft.notes} emptyText="暂无内容可预览" /> : <textarea value={draft.notes} onChange={(event) => setDraft({ ...draft, notes: event.target.value })} placeholder={"使用 Markdown 编写敏感笔记…\n\n## 恢复代码\n- XXXX-XXXX\n- XXXX-XXXX"} spellCheck={false} />}
