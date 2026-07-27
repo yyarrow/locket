@@ -18,6 +18,7 @@ import {
   type TotpConfig,
 } from "@/lib/totp";
 import { decodeTotpQrImage } from "@/lib/totp-qr";
+import { SecurityCenter } from "./security-center";
 
 type Category = "login" | "token" | "totp" | "card" | "note" | "wifi";
 type VaultItem = {
@@ -214,6 +215,7 @@ export function VaultApp() {
   const [backupConfirmed, setBackupConfirmed] = useState(false);
   const [backupError, setBackupError] = useState("");
   const [backupBusy, setBackupBusy] = useState(false);
+  const [securityOpen, setSecurityOpen] = useState(false);
   const [toast, setToast] = useState("");
   const [syncState, setSyncState] = useState<"saved" | "saving" | "error">("saved");
   const dataKeyRef = useRef<CryptoKey | null>(null);
@@ -268,6 +270,7 @@ export function VaultApp() {
     setPendingBackup(null);
     setBackupPassword("");
     setEditorOpen(false);
+    setSecurityOpen(false);
     setPhase("locked");
   }, []);
 
@@ -402,9 +405,26 @@ export function VaultApp() {
     finally { setBusy(false); }
   };
 
+  const leaveAccount = () => {
+    dataKeyRef.current = null; setEnvelope(null); setData({ items: [], createdAt: 0 }); setMobileMenuOpen(false); setMobileDetailOpen(false); setPendingBackup(null); setBackupPassword(""); setSecurityOpen(false); setPhase("account");
+  };
+
   const logout = async () => {
     await requestJson("/api/auth/logout", { method: "POST" }).catch(() => null);
-    dataKeyRef.current = null; setEnvelope(null); setData({ items: [], createdAt: 0 }); setMobileMenuOpen(false); setMobileDetailOpen(false); setPendingBackup(null); setBackupPassword(""); setPhase("account");
+    leaveAccount();
+  };
+
+  const saveSecurityEnvelope = async (next: VaultEnvelope) => {
+    setSyncState("saving");
+    try {
+      const saved = await putEnvelope(next);
+      setEnvelope(saved);
+      setSyncState("saved");
+      return saved;
+    } catch (cause) {
+      setSyncState("error");
+      throw cause;
+    }
   };
 
   const filtered = useMemo(() => {
@@ -623,7 +643,7 @@ export function VaultApp() {
       <div className="brand-row"><div className="brand-mark">L</div><span>Locket</span><span className="account-email">{accountEmail}</span></div>
       <div className="auth-copy"><span className="eyebrow">端到端加密保险库</span><h1>{setup ? "创建主密码" : recovering ? "使用恢复密钥" : "解锁保险库"}</h1><p>{setup ? "主密码不会上传，也无法通过邮箱找回。下一步会生成恢复密钥。" : recovering ? "输入恢复密钥并设置新的主密码。" : "密文已从云端取回，解密只在此设备进行。"}</p></div>
       <form onSubmit={setup ? handleSetup : recovering ? handleRecovery : handleUnlock} className="auth-form">
-        {recovering && <label>恢复密钥<input value={recoveryCode} onChange={(event) => setRecoveryCode(event.target.value)} placeholder="LK1-…" autoComplete="off" /></label>}
+        {recovering && <label>恢复密钥<input value={recoveryCode} onChange={(event) => setRecoveryCode(event.target.value)} placeholder="LK2-…（也支持旧版 LK1）" autoComplete="off" /></label>}
         <label>{recovering ? "新主密码" : "主密码"}<input type="password" autoFocus autoComplete="off" value={masterPassword} onChange={(event) => setMasterPassword(event.target.value)} placeholder={setup || recovering ? "至少 12 个字符" : "输入主密码"} /></label>
         {(setup || recovering) && <label>确认主密码<input type="password" autoComplete="off" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} placeholder="再次输入主密码" /></label>}
         {error && <p className="form-error">{error}</p>}
@@ -661,6 +681,7 @@ export function VaultApp() {
       <div className="sidebar-bottom">
         <button onClick={exportVault}><span>↓</span> 导出加密备份</button><button onClick={() => importRef.current?.click()}><span>↑</span> 导入备份</button>
         <input ref={importRef} hidden type="file" accept="application/json,.json" onChange={(event) => { const file = event.target.files?.[0]; if (file) void stageBackupImport(file); event.currentTarget.value = ""; }} />
+        <button onClick={() => { setMobileMenuOpen(false); setSecurityOpen(true); }}><span>◇</span> 安全中心</button>
         <button onClick={lock}><span>⌁</span> 锁定保险库</button><button onClick={() => void logout()}><span>×</span> 退出账号</button>
         <div className={`local-status ${syncState}`}><i /> {syncState === "saving" ? "正在加密同步" : syncState === "error" ? "同步失败" : "密文已安全同步"}</div>
       </div>
@@ -738,6 +759,7 @@ export function VaultApp() {
         <footer><button type="button" disabled={backupBusy} onClick={closeBackupImport}>取消</button><button className="primary-button" disabled={backupBusy || !backupConfirmed || !backupPassword}>{backupBusy ? "正在本地验证…" : "验证并恢复"}</button></footer>
       </form>
     </section></div>}
+    {securityOpen && envelope && <SecurityCenter email={accountEmail} envelope={envelope} onClose={() => setSecurityOpen(false)} onSaveEnvelope={saveSecurityEnvelope} onCurrentSessionRemoved={leaveAccount} />}
     {toast && <div className="toast" role="status">✓ {toast}</div>}
   </main>;
 }

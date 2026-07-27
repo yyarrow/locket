@@ -121,3 +121,34 @@ test("backup restore validates locally before replacing the remote vault", async
   assert.match(app, /验证成功前，不会修改云端保险库/u);
   assert.match(app, /我了解验证成功后，当前云端保险库将被此备份替换/u);
 });
+
+test("security center rewraps keys and constrains session removal", async () => {
+  const [app, security, sessionsRoute] = await Promise.all([
+    read("../app/vault-app.tsx"),
+    read("../app/security-center.tsx"),
+    read("../app/api/account/sessions/route.ts"),
+  ]);
+  assert.match(app, /onSaveEnvelope=\{saveSecurityEnvelope\}/u);
+  assert.match(security, /changeVaultPassword\(envelope, currentPassword, newPassword\)/u);
+  assert.match(security, /rotateVaultRecoveryKey\(envelope, recoveryPassword\)/u);
+  assert.match(security, /我已将新恢复密钥保存到安全的位置/u);
+  assert.match(sessionsRoute, /isSameOrigin\(request\)/u);
+  assert.match(sessionsRoute, /eq\(sessions\.userId, user\.id\)/u);
+  assert.match(sessionsRoute, /sessionId === currentSessionId/u);
+});
+
+test("account deletion requires a purpose-bound email token and explicit confirmation", async () => {
+  const [requestRoute, confirmRoute, tokens, page] = await Promise.all([
+    read("../app/api/account/delete-request/route.ts"),
+    read("../app/api/account/delete-confirm/route.ts"),
+    read("../lib/auth-tokens.ts"),
+    read("../app/delete-account-page.tsx"),
+  ]);
+  assert.match(requestRoute, /issueAuthToken\(user\.id, "delete-account"\)/u);
+  assert.match(requestRoute, /checkRateLimit/u);
+  assert.match(confirmRoute, /consumeAuthToken\(token, "delete-account"\)/u);
+  assert.match(confirmRoute, /db\.delete\(users\)/u);
+  assert.match(tokens, /"delete-account": 30 \* 60 \* 1000/u);
+  assert.match(page, /onClick=\{\(\) => void confirmDeletion\(\)\}/u);
+  assert.doesNotMatch(page, /useEffect/u);
+});

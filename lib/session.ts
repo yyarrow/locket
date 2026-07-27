@@ -44,6 +44,15 @@ export async function destroySession(): Promise<void> {
   store.delete(COOKIE_NAME);
 }
 
+export async function clearSessionCookie(): Promise<void> {
+  (await cookies()).delete(COOKIE_NAME);
+}
+
+export async function getCurrentSessionId(): Promise<string | null> {
+  const token = (await cookies()).get(COOKIE_NAME)?.value;
+  return token ? hashToken(token) : null;
+}
+
 export async function getCurrentUser() {
   const token = (await cookies()).get(COOKIE_NAME)?.value;
   if (!token) return null;

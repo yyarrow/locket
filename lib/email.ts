@@ -50,3 +50,9 @@ export async function sendLoginEmail(email: string, token: string) {
   await deliver(email, "登录 Locket", `<p>点击下面的链接登录 Locket：</p><p><a href="${url}">登录 Locket</a></p><p>链接将在 15 分钟后失效，且只能使用一次。如果不是你发起的请求，请忽略此邮件。</p>`);
   return process.env.NODE_ENV === "production" ? undefined : url;
 }
+
+export async function sendAccountDeletionEmail(email: string, token: string) {
+  const url = `${appUrl()}/delete-account?token=${encodeURIComponent(token)}`;
+  await deliver(email, "确认删除 Locket 账号", `<p>我们收到了删除 Locket 账号的请求。</p><p><a href="${url}">检查并确认删除账号</a></p><p>打开链接后仍需再次确认。链接将在 30 分钟后失效，且只能使用一次。如果不是你发起的请求，请忽略此邮件。</p>`);
+  return process.env.NODE_ENV === "production" ? undefined : url;
+}
