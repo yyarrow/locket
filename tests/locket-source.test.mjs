@@ -111,3 +111,13 @@ test("mobile vault navigation exposes categories and item details", async () => 
   assert.match(styles, /\.sidebar\.mobile-open \{ transform: translateX\(0\); \}/u);
   assert.match(styles, /\.app-shell\.mobile-detail-open \.detail-panel/u);
 });
+
+test("backup restore validates locally before replacing the remote vault", async () => {
+  const app = await read("../app/vault-app.tsx");
+  assert.match(app, /const unlocked = await unlockVault<unknown>\(pendingBackup\.envelope, backupPassword\)/u);
+  assert.match(app, /isVaultData\(unlocked\.data\)/u);
+  assert.match(app, /downloadEnvelope\(envelope, "locket-before-restore"\)/u);
+  assert.match(app, /await putEnvelope\(\{ \.\.\.pendingBackup\.envelope, revision: envelope\.revision \}\)/u);
+  assert.match(app, /验证成功前，不会修改云端保险库/u);
+  assert.match(app, /我了解验证成功后，当前云端保险库将被此备份替换/u);
+});

@@ -34,6 +34,7 @@ type VaultItem = {
 };
 type VaultItemDraft = Omit<VaultItem, "id" | "updatedAt" | "totp"> & { totpInput: string };
 type VaultData = { items: VaultItem[]; createdAt: number };
+type PendingBackup = { envelope: VaultEnvelope; fileName: string; exportedAt: string | null };
 type Phase = "loading" | "account" | "email-sent" | "setup" | "recovery-save" | "locked" | "recover" | "open";
 
 const AUTO_LOCK_MS = 5 * 60 * 1000;
@@ -141,6 +142,39 @@ function toEnvelope(value: unknown): VaultEnvelope | null {
   return isVaultEnvelope(envelope) ? envelope : null;
 }
 
+function isTotpConfig(value: unknown): value is TotpConfig {
+  if (!value || typeof value !== "object") return false;
+  const input = value as Partial<TotpConfig>;
+  return typeof input.secret === "string" && /^[A-Z2-7]+$/u.test(input.secret) &&
+    (input.algorithm === "SHA1" || input.algorithm === "SHA256" || input.algorithm === "SHA512") &&
+    (input.digits === 6 || input.digits === 8) && Number.isInteger(input.period) && input.period! >= 1 && input.period! <= 3600 &&
+    typeof input.issuer === "string" && typeof input.account === "string";
+}
+
+function isVaultData(value: unknown): value is VaultData {
+  if (!value || typeof value !== "object") return false;
+  const input = value as Partial<VaultData>;
+  if (!Number.isFinite(input.createdAt) || !Array.isArray(input.items) || input.items.length > 500) return false;
+  return input.items.every((value) => {
+    if (!value || typeof value !== "object") return false;
+    const item = value as Partial<VaultItem>;
+    return typeof item.id === "string" && typeof item.title === "string" && typeof item.username === "string" &&
+      typeof item.password === "string" && typeof item.url === "string" && typeof item.notes === "string" &&
+      typeof item.category === "string" && item.category in categoryMeta && typeof item.favorite === "boolean" &&
+      Number.isFinite(item.updatedAt) && (item.totp === undefined || isTotpConfig(item.totp));
+  });
+}
+
+function downloadEnvelope(envelope: VaultEnvelope, prefix = "locket-backup") {
+  const blob = new Blob([JSON.stringify({ type: "locket-encrypted-backup", exportedAt: new Date().toISOString(), vault: envelope }, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = `${prefix}-${new Date().toISOString().slice(0, 10)}.json`;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
 async function requestJson<T>(url: string, options?: RequestInit): Promise<T> {
   const response = await fetch(url, options);
   const data = await response.json().catch(() => ({}));
@@ -175,6 +209,11 @@ export function VaultApp() {
   const [notePreview, setNotePreview] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState(emptyDraft());
+  const [pendingBackup, setPendingBackup] = useState<PendingBackup | null>(null);
+  const [backupPassword, setBackupPassword] = useState("");
+  const [backupConfirmed, setBackupConfirmed] = useState(false);
+  const [backupError, setBackupError] = useState("");
+  const [backupBusy, setBackupBusy] = useState(false);
   const [toast, setToast] = useState("");
   const [syncState, setSyncState] = useState<"saved" | "saving" | "error">("saved");
   const dataKeyRef = useRef<CryptoKey | null>(null);
@@ -226,6 +265,8 @@ export function VaultApp() {
     setRevealed(false);
     setMobileMenuOpen(false);
     setMobileDetailOpen(false);
+    setPendingBackup(null);
+    setBackupPassword("");
     setEditorOpen(false);
     setPhase("locked");
   }, []);
@@ -363,7 +404,7 @@ export function VaultApp() {
 
   const logout = async () => {
     await requestJson("/api/auth/logout", { method: "POST" }).catch(() => null);
-    dataKeyRef.current = null; setEnvelope(null); setData({ items: [], createdAt: 0 }); setMobileMenuOpen(false); setMobileDetailOpen(false); setPhase("account");
+    dataKeyRef.current = null; setEnvelope(null); setData({ items: [], createdAt: 0 }); setMobileMenuOpen(false); setMobileDetailOpen(false); setPendingBackup(null); setBackupPassword(""); setPhase("account");
   };
 
   const filtered = useMemo(() => {
@@ -512,18 +553,52 @@ export function VaultApp() {
   };
   const exportVault = () => {
     if (!envelope) return;
-    const blob = new Blob([JSON.stringify({ type: "locket-encrypted-backup", exportedAt: new Date().toISOString(), vault: envelope }, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob); const anchor = document.createElement("a"); anchor.href = url;
-    anchor.download = `locket-backup-${new Date().toISOString().slice(0, 10)}.json`; anchor.click(); URL.revokeObjectURL(url); setToast("加密备份已导出");
+    downloadEnvelope(envelope);
+    setToast("加密备份已导出");
   };
-  const importVault = async (file: File) => {
+  const stageBackupImport = async (file: File) => {
     try {
-      const parsed = JSON.parse(await file.text()) as { vault?: unknown };
+      const parsed = JSON.parse(await file.text()) as { vault?: unknown; exportedAt?: unknown };
       const imported = toEnvelope(parsed.vault ?? parsed);
       if (!imported || !envelope) throw new Error("文件格式不正确");
-      const saved = await putEnvelope({ ...imported, revision: envelope.revision });
-      setEnvelope(saved); setToast("备份已恢复，请使用备份对应的主密码解锁"); lock();
-    } catch (cause) { setToast(cause instanceof Error ? cause.message : "无法导入备份"); }
+      setPendingBackup({ envelope: imported, fileName: file.name, exportedAt: typeof parsed.exportedAt === "string" ? parsed.exportedAt : null });
+      setBackupPassword("");
+      setBackupConfirmed(false);
+      setBackupError("");
+    } catch (cause) { setToast(cause instanceof Error ? cause.message : "无法读取备份"); }
+  };
+  const closeBackupImport = () => {
+    if (backupBusy) return;
+    setPendingBackup(null);
+    setBackupPassword("");
+    setBackupConfirmed(false);
+    setBackupError("");
+  };
+  const restoreBackup = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!pendingBackup || !envelope || !backupConfirmed || !backupPassword) return;
+    setBackupBusy(true);
+    setBackupError("");
+    try {
+      const unlocked = await unlockVault<unknown>(pendingBackup.envelope, backupPassword).catch(() => {
+        throw new Error("备份主密码不正确，或备份已经损坏");
+      });
+      if (!isVaultData(unlocked.data) || unlocked.data.items.length !== pendingBackup.envelope.itemCount) throw new Error("备份内容格式无效或已经损坏");
+      downloadEnvelope(envelope, "locket-before-restore");
+      const saved = await putEnvelope({ ...pendingBackup.envelope, revision: envelope.revision });
+      dataKeyRef.current = unlocked.dataKey;
+      setEnvelope(saved);
+      setData(unlocked.data);
+      setSelectedId(unlocked.data.items[0]?.id ?? null);
+      setCategory("all");
+      setMobileDetailOpen(false);
+      closeBackupImport();
+      setToast(`已恢复 ${unlocked.data.items.length} 个条目，并下载恢复前备份`);
+    } catch (cause) {
+      setBackupError(cause instanceof Error ? cause.message : "无法恢复备份");
+    } finally {
+      setBackupBusy(false);
+    }
   };
 
   if (phase === "loading") return <main className="auth-shell"><div className="auth-card loading-card" role="status"><div className="brand-mark">L</div><p>正在安全连接…</p></div></main>;
@@ -585,7 +660,7 @@ export function VaultApp() {
       </nav>
       <div className="sidebar-bottom">
         <button onClick={exportVault}><span>↓</span> 导出加密备份</button><button onClick={() => importRef.current?.click()}><span>↑</span> 导入备份</button>
-        <input ref={importRef} hidden type="file" accept="application/json,.json" onChange={(event) => { const file = event.target.files?.[0]; if (file) void importVault(file); event.currentTarget.value = ""; }} />
+        <input ref={importRef} hidden type="file" accept="application/json,.json" onChange={(event) => { const file = event.target.files?.[0]; if (file) void stageBackupImport(file); event.currentTarget.value = ""; }} />
         <button onClick={lock}><span>⌁</span> 锁定保险库</button><button onClick={() => void logout()}><span>×</span> 退出账号</button>
         <div className={`local-status ${syncState}`}><i /> {syncState === "saving" ? "正在加密同步" : syncState === "error" ? "同步失败" : "密文已安全同步"}</div>
       </div>
@@ -652,6 +727,17 @@ export function VaultApp() {
       {editorError && <p className="form-error">{editorError}</p>}
       <footer><button type="button" onClick={() => setEditorOpen(false)}>取消</button><button className="primary-button">保存并同步</button></footer>
     </form></section></div>}
+    {pendingBackup && <div className="modal-backdrop backup-backdrop" role="presentation" onMouseDown={closeBackupImport}><section className="backup-dialog" role="dialog" aria-modal="true" aria-labelledby="backup-title" onMouseDown={(event) => event.stopPropagation()}>
+      <header><div><span className="eyebrow">本地解密验证</span><h2 id="backup-title">恢复加密备份</h2></div><button aria-label="关闭" disabled={backupBusy} onClick={closeBackupImport}>×</button></header>
+      <form onSubmit={restoreBackup}>
+        <div className="backup-summary"><span>备份文件</span><strong>{pendingBackup.fileName}</strong><small>{pendingBackup.envelope.itemCount} 个条目{pendingBackup.exportedAt ? ` · ${new Date(pendingBackup.exportedAt).toLocaleString("zh-CN")}` : ""}</small></div>
+        <p className="backup-explanation">先在此浏览器中使用备份对应的主密码完成解密验证。验证成功前，不会修改云端保险库。</p>
+        <label>备份主密码<input type="password" required autoFocus autoComplete="off" value={backupPassword} onChange={(event) => { setBackupPassword(event.target.value); setBackupError(""); }} placeholder="用于解锁这个备份" /></label>
+        <label className="backup-confirm"><input type="checkbox" checked={backupConfirmed} onChange={(event) => setBackupConfirmed(event.target.checked)} /> <span>我了解验证成功后，当前云端保险库将被此备份替换。Locket 会先自动下载一份当前密文备份。</span></label>
+        {backupError && <p className="form-error">{backupError}</p>}
+        <footer><button type="button" disabled={backupBusy} onClick={closeBackupImport}>取消</button><button className="primary-button" disabled={backupBusy || !backupConfirmed || !backupPassword}>{backupBusy ? "正在本地验证…" : "验证并恢复"}</button></footer>
+      </form>
+    </section></div>}
     {toast && <div className="toast" role="status">✓ {toast}</div>}
   </main>;
 }
