@@ -125,7 +125,8 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, a:focus-visib
 .list-panel { min-height: 100vh; border-right: 1px solid var(--line); background: #fcfcf9; display: flex; flex-direction: column; }
 .panel-header { padding: 31px 26px 19px; display: flex; justify-content: space-between; align-items: center; }
 .panel-header h1 { margin: 5px 0 0; font-family: Georgia, "Songti SC", serif; font-size: 28px; font-weight: 500; letter-spacing: -.025em; }
-.mobile-new { display: none; }
+.panel-header-actions { display: flex; align-items: center; gap: 8px; }
+.mobile-new, .mobile-menu-button, .mobile-back, .mobile-menu-close, .mobile-menu-backdrop { display: none; }
 .search-box { margin: 0 21px 18px; height: 40px; display: flex; align-items: center; gap: 9px; padding: 0 11px; border: 1px solid #e1e2da; border-radius: 9px; background: white; color: #8c8e86; }
 .search-box input { min-width: 0; flex: 1; border: 0; outline: 0; color: var(--ink); background: transparent; font-size: 12px; }
 .search-box input::placeholder { color: #a4a69f; }
@@ -278,13 +279,30 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, a:focus-visib
   .sidebar nav button, .sidebar-bottom button { justify-content: center; }
   .sidebar nav button b { display: none; }
   .detail-panel { display: none; }
+  .app-shell.mobile-detail-open .detail-panel { position: fixed; inset: 0; z-index: 15; display: block; overflow-y: auto; background: white; }
+  .mobile-back { width: 36px; height: 36px; flex: 0 0 auto; display: grid; place-items: center; border: 1px solid #e2e3dc; border-radius: 9px; background: white; color: var(--green); font-size: 27px; cursor: pointer; }
+  .detail-header { min-height: 96px; padding: 20px; }
+  .detail-body { max-width: none; padding: 28px 20px 60px; }
 }
 @media (max-width: 520px) {
   .app-shell { display: block; }
-  .sidebar { display: none; }
+  .sidebar { position: fixed; inset: 0 auto 0 0; z-index: 25; width: min(300px, 86vw); display: flex; transform: translateX(-105%); transition: transform .2s ease; box-shadow: 18px 0 50px #1521192b; }
+  .sidebar.mobile-open { transform: translateX(0); }
+  .sidebar.mobile-open .sidebar-brand { justify-content: flex-start; padding: 0 8px; }
+  .sidebar.mobile-open .sidebar-brand > span { font-size: 19px; }
+  .sidebar.mobile-open .new-button { padding: 11px 13px; font-size: 13px; text-align: left; }
+  .sidebar.mobile-open .new-button span { margin-right: 6px; font-size: 17px; }
+  .sidebar.mobile-open nav button, .sidebar.mobile-open .sidebar-bottom button { justify-content: flex-start; font-size: 12px; }
+  .sidebar.mobile-open nav button b { display: block; }
+  .sidebar.mobile-open .nav-label { font-size: 10px; }
+  .sidebar.mobile-open .local-status { font-size: 9px; }
+  .mobile-menu-close { width: 34px; height: 34px; margin-left: auto; display: grid; place-items: center; border: 0; background: transparent; color: #747970; font-size: 24px; cursor: pointer; }
+  .mobile-menu-backdrop { position: fixed; inset: 0; z-index: 24; display: block; border: 0; background: #15211970; backdrop-filter: blur(2px); }
   .list-panel { min-height: 100vh; border-right: 0; }
   .panel-header { padding-top: 24px; }
-  .mobile-new { width: 38px; height: 38px; display: grid; place-items: center; border: 0; border-radius: 10px; background: var(--green); color: white; font-size: 20px; }
+  .mobile-menu-button, .mobile-new { width: 38px; height: 38px; display: grid; place-items: center; border: 0; border-radius: 10px; font-size: 20px; cursor: pointer; }
+  .mobile-menu-button { border: 1px solid #dde2dc; background: white; color: var(--green); font-size: 17px; }
+  .mobile-new { background: var(--green); color: white; }
   .auth-card { padding: 27px 23px 25px; }
   .auth-copy { margin-top: 42px; }
   .auth-copy h1 { font-size: 30px; }

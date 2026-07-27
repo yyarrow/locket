@@ -164,6 +164,8 @@ export function VaultApp() {
   const [category, setCategory] = useState<Category | "all" | "favorites">("all");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [revealed, setRevealed] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
   const [editorOpen, setEditorOpen] = useState(false);
   const [editorError, setEditorError] = useState("");
   const [tokenInputRevealed, setTokenInputRevealed] = useState(false);
@@ -222,6 +224,8 @@ export function VaultApp() {
     setConfirmPassword("");
     setRecoveryCode("");
     setRevealed(false);
+    setMobileMenuOpen(false);
+    setMobileDetailOpen(false);
     setEditorOpen(false);
     setPhase("locked");
   }, []);
@@ -359,7 +363,7 @@ export function VaultApp() {
 
   const logout = async () => {
     await requestJson("/api/auth/logout", { method: "POST" }).catch(() => null);
-    dataKeyRef.current = null; setEnvelope(null); setData({ items: [], createdAt: 0 }); setPhase("account");
+    dataKeyRef.current = null; setEnvelope(null); setData({ items: [], createdAt: 0 }); setMobileMenuOpen(false); setMobileDetailOpen(false); setPhase("account");
   };
 
   const filtered = useMemo(() => {
@@ -379,10 +383,15 @@ export function VaultApp() {
   const isNoteDraft = draft.category === "note";
   const hasLegacyTotp = draft.category === "login" && editingItem?.category === "login" && Boolean(editingItem.totp);
   const showTotpEditor = isTotpDraft || hasLegacyTotp;
+  const selectCategory = (next: Category | "all" | "favorites") => {
+    setCategory(next);
+    setMobileMenuOpen(false);
+    setMobileDetailOpen(false);
+  };
   const openNew = () => {
     if (data.items.length >= 500) return setToast("免费版最多保存 500 个条目");
     const itemCategory = contextualCategory ?? "login";
-    setEditingId(null); setDraft({ ...emptyDraft(), category: itemCategory, password: itemCategory === "token" ? makeToken() : itemCategory === "totp" || itemCategory === "note" ? "" : makePassword() }); setEditorError(""); setTokenInputRevealed(false); setTotpInputRevealed(false); setTotpScanStatus(""); setNotePreview(false); setEditorOpen(true);
+    setMobileMenuOpen(false); setEditingId(null); setDraft({ ...emptyDraft(), category: itemCategory, password: itemCategory === "token" ? makeToken() : itemCategory === "totp" || itemCategory === "note" ? "" : makePassword() }); setEditorError(""); setTokenInputRevealed(false); setTotpInputRevealed(false); setTotpScanStatus(""); setNotePreview(false); setEditorOpen(true);
   };
   const openEdit = (item: VaultItem) => {
     setEditingId(item.id);
@@ -491,7 +500,7 @@ export function VaultApp() {
   const deleteItem = async (item: VaultItem) => {
     if (!window.confirm(`删除“${item.title}”？此操作无法撤销。`)) return;
     const items = data.items.filter((current) => current.id !== item.id);
-    await saveData({ ...data, items }); setSelectedId(items[0]?.id ?? null); setToast("条目已删除");
+    await saveData({ ...data, items }); setSelectedId(items[0]?.id ?? null); setMobileDetailOpen(false); setToast("条目已删除");
   };
   const toggleFavorite = async (item: VaultItem) => {
     const items = data.items.map((current) => current.id === item.id ? { ...current, favorite: !current.favorite, updatedAt: Date.now() } : current);
@@ -563,15 +572,16 @@ export function VaultApp() {
     </section><p className="auth-footer">关闭页面前请先保存恢复密钥</p></main>;
   }
 
-  return <main className="app-shell">
-    <aside className="sidebar">
-      <div className="brand-row sidebar-brand"><div className="brand-mark">L</div><span>Locket</span></div>
+  return <main className={`app-shell ${mobileDetailOpen ? "mobile-detail-open" : ""}`}>
+    {mobileMenuOpen && <button className="mobile-menu-backdrop" aria-label="关闭菜单" onClick={() => setMobileMenuOpen(false)} />}
+    <aside className={`sidebar ${mobileMenuOpen ? "mobile-open" : ""}`}>
+      <div className="brand-row sidebar-brand"><div className="brand-mark">L</div><span>Locket</span><button className="mobile-menu-close" aria-label="关闭菜单" onClick={() => setMobileMenuOpen(false)}>×</button></div>
       <button className="new-button" onClick={openNew}><span>＋</span> 新建条目</button>
       <nav aria-label="保险库分类"><p className="nav-label">保险库</p>
-        <button className={category === "all" ? "active" : ""} onClick={() => setCategory("all")}><span className="nav-icon">◇</span> 所有条目 <b>{data.items.length}</b></button>
-        <button className={category === "favorites" ? "active" : ""} onClick={() => setCategory("favorites")}><span className="nav-icon">☆</span> 收藏 <b>{data.items.filter((item) => item.favorite).length}</b></button>
+        <button className={category === "all" ? "active" : ""} onClick={() => selectCategory("all")}><span className="nav-icon">◇</span> 所有条目 <b>{data.items.length}</b></button>
+        <button className={category === "favorites" ? "active" : ""} onClick={() => selectCategory("favorites")}><span className="nav-icon">☆</span> 收藏 <b>{data.items.filter((item) => item.favorite).length}</b></button>
         <p className="nav-label categories-label">分类</p>
-        {(Object.keys(categoryMeta) as Category[]).map((key) => <button key={key} className={category === key ? "active" : ""} onClick={() => setCategory(key)}><span className="nav-icon">{categoryMeta[key].glyph}</span> {categoryMeta[key].label}<b>{data.items.filter((item) => item.category === key).length}</b></button>)}
+        {(Object.keys(categoryMeta) as Category[]).map((key) => <button key={key} className={category === key ? "active" : ""} onClick={() => selectCategory(key)}><span className="nav-icon">{categoryMeta[key].glyph}</span> {categoryMeta[key].label}<b>{data.items.filter((item) => item.category === key).length}</b></button>)}
       </nav>
       <div className="sidebar-bottom">
         <button onClick={exportVault}><span>↓</span> 导出加密备份</button><button onClick={() => importRef.current?.click()}><span>↑</span> 导入备份</button>
@@ -581,13 +591,14 @@ export function VaultApp() {
       </div>
     </aside>
     <section className="list-panel">
-      <div className="panel-header"><div><span className="eyebrow">{accountEmail}</span><h1>{category === "all" ? "所有条目" : category === "favorites" ? "收藏" : categoryMeta[category].label}</h1></div><button className="mobile-new" onClick={openNew}>＋</button></div>
+      <div className="panel-header"><div><span className="eyebrow">{accountEmail}</span><h1>{category === "all" ? "所有条目" : category === "favorites" ? "收藏" : categoryMeta[category].label}</h1></div><div className="panel-header-actions"><button className="mobile-menu-button" aria-label="打开菜单" onClick={() => setMobileMenuOpen(true)}>☰</button><button className="mobile-new" aria-label="新建条目" onClick={openNew}>＋</button></div></div>
       <label className="search-box"><span>⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索保险库" /><kbd>⌘ K</kbd></label>
       <div className="item-count">{filtered.length} / 500 个条目</div>
-      <div className="item-list">{filtered.length === 0 ? <div className="empty-state"><div>＋</div><h2>{query ? "没有匹配的条目" : "保险库还是空的"}</h2><p>{query ? "试试其他关键词。" : "保存你的第一个登录信息或安全笔记。"}</p>{!query && <button onClick={openNew}>新建条目</button>}</div> : filtered.map((item) => <button className={`item-row ${selected?.id === item.id ? "selected" : ""}`} key={item.id} onClick={() => { setSelectedId(item.id); setRevealed(false); }}><span className={`item-avatar ${item.category}`}>{item.title.slice(0, 1).toUpperCase()}</span><span className="item-text"><strong>{item.title}</strong><small>{item.username || categoryMeta[item.category].label}</small></span>{item.favorite && <span className="favorite-star">★</span>}<span className="chevron">›</span></button>)}</div>
+      <div className="item-list">{filtered.length === 0 ? <div className="empty-state"><div>＋</div><h2>{query ? "没有匹配的条目" : "保险库还是空的"}</h2><p>{query ? "试试其他关键词。" : "保存你的第一个登录信息或安全笔记。"}</p>{!query && <button onClick={openNew}>新建条目</button>}</div> : filtered.map((item) => <button className={`item-row ${selected?.id === item.id ? "selected" : ""}`} key={item.id} onClick={() => { setSelectedId(item.id); setRevealed(false); setMobileDetailOpen(true); }}><span className={`item-avatar ${item.category}`}>{item.title.slice(0, 1).toUpperCase()}</span><span className="item-text"><strong>{item.title}</strong><small>{item.username || categoryMeta[item.category].label}</small></span>{item.favorite && <span className="favorite-star">★</span>}<span className="chevron">›</span></button>)}</div>
     </section>
     <section className="detail-panel">{selected ? <>
       <header className="detail-header">
+        <button className="mobile-back" aria-label="返回条目列表" onClick={() => setMobileDetailOpen(false)}>‹</button>
         <div className={`detail-avatar ${selected.category}`}>{selected.title.slice(0, 1).toUpperCase()}</div>
         <div><h2>{selected.title}</h2><p>{categoryMeta[selected.category].label}</p></div>
         <div className="detail-actions"><button aria-label={selected.favorite ? "取消收藏" : "收藏"} onClick={() => void toggleFavorite(selected)}>{selected.favorite ? "★" : "☆"}</button><button onClick={() => openEdit(selected)}>编辑</button><button className="danger-action" onClick={() => void deleteItem(selected)}>删除</button></div>

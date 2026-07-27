@@ -98,3 +98,16 @@ test("API tokens are standalone encrypted entries with dedicated secret controls
   assert.match(app, /void copy\(selected\.password, "Token"\)/u);
   assert.match(app, /selected\.category === "token" \? "API 地址" : "网站"/u);
 });
+
+test("mobile vault navigation exposes categories and item details", async () => {
+  const [app, styles] = await Promise.all([
+    read("../app/vault-app.tsx"),
+    read("../app/globals.css"),
+  ]);
+  assert.match(app, /mobileMenuOpen/u);
+  assert.match(app, /mobileDetailOpen/u);
+  assert.match(app, /aria-label="打开菜单"/u);
+  assert.match(app, /aria-label="返回条目列表"/u);
+  assert.match(styles, /\.sidebar\.mobile-open \{ transform: translateX\(0\); \}/u);
+  assert.match(styles, /\.app-shell\.mobile-detail-open \.detail-panel/u);
+});
