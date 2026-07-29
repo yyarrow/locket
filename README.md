@@ -41,6 +41,11 @@ npm test
 
 这是可用的公测版本，并非经过独立安全审计的正式密码管理器。恢复密钥丢失且忘记主密码后，保险库无法恢复。正式承载高价值凭据前，应完成专业密码学审计、依赖审计、浏览器威胁模型评审，并补齐隐私政策等合规材料。
 
+上线准备材料：
+
+- [上线前安全检查清单](./docs/security/launch-readiness.md)
+- [OWASP ASVS 5.0 优先差距表](./docs/security/asvs-5.0-gap-assessment.md)
+
 ## 许可证
 
 [MIT](./LICENSE)
