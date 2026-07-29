@@ -22,21 +22,34 @@ test("sync schema contains ciphertext metadata but no vault plaintext fields", a
 });
 
 test("account and session safeguards remain enabled", async () => {
-  const [emailLink, verify, session, limiter, vaultRoute] = await Promise.all([
+  const [emailLink, verify, authLinkPage, session, sessionsRoute, limiter, vaultRoute, proxy] = await Promise.all([
     read("../app/api/auth/email-link/route.ts"),
     read("../app/api/auth/verify/route.ts"),
+    read("../app/auth-link-page.tsx"),
     read("../lib/session.ts"),
+    read("../app/api/account/sessions/route.ts"),
     read("../lib/rate-limit.ts"),
     read("../app/api/vault/route.ts"),
+    read("../proxy.ts"),
   ]);
   assert.match(emailLink, /REGISTRATION_MODE/);
   assert.match(emailLink, /isSameOrigin/);
   assert.match(emailLink, /checkRateLimit/);
   assert.match(verify, /createSession/);
+  assert.match(authLinkPage, /window\.history\.replaceState\(window\.history\.state, "", window\.location\.pathname\)/u);
+  assert.match(session, /__Host-locket_session/u);
   assert.match(session, /httpOnly: true/);
   assert.match(session, /sameSite: "lax"/);
+  assert.match(session, /SESSION_IDLE_TTL_SECONDS = 60 \* 60 \* 24 \* 7/u);
+  assert.match(session, /SESSION_TTL_SECONDS = 60 \* 60 \* 24 \* 30/u);
+  assert.match(session, /inArray\(sessions\.id, previousSessionIds\)/u);
+  assert.match(session, /if \(usingLegacyCookie\)[\s\S]*store\.set\(COOKIE_NAME, token, sessionCookieOptions\(remainingSeconds\)\)/u);
+  assert.match(session, /gt\(sessions\.lastSeenAt, sessionIdleCutoff\(now\)\)/u);
+  assert.match(session, /set\(\{ lastSeenAt: now \}\)/u);
+  assert.match(sessionsRoute, /gt\(sessions\.lastSeenAt, sessionIdleCutoff\(\)\)/u);
   assert.match(limiter, /on conflict \(key\) do update/);
   assert.match(vaultRoute, /eq\(vaults\.revision, payload\.revision\)/);
+  assert.doesNotMatch(proxy, /\?!api\|/u);
 });
 
 test("client keeps local safety controls without plaintext persistence", async () => {
@@ -114,6 +127,8 @@ test("mobile vault navigation exposes categories and item details", async () => 
 
 test("backup restore validates locally before replacing the remote vault", async () => {
   const app = await read("../app/vault-app.tsx");
+  assert.match(app, /const MAX_BACKUP_FILE_BYTES = 8 \* 1024 \* 1024/u);
+  assert.match(app, /if \(file\.size > MAX_BACKUP_FILE_BYTES\)[\s\S]*await file\.text\(\)/u);
   assert.match(app, /const unlocked = await unlockVault<unknown>\(pendingBackup\.envelope, backupPassword\)/u);
   assert.match(app, /isVaultData\(unlocked\.data\)/u);
   assert.match(app, /downloadEnvelope\(envelope, "locket-before-restore"\)/u);

@@ -39,6 +39,7 @@ type PendingBackup = { envelope: VaultEnvelope; fileName: string; exportedAt: st
 type Phase = "loading" | "account" | "email-sent" | "setup" | "recovery-save" | "locked" | "recover" | "open";
 
 const AUTO_LOCK_MS = 5 * 60 * 1000;
+const MAX_BACKUP_FILE_BYTES = 8 * 1024 * 1024;
 const categoryMeta: Record<Category, { label: string; glyph: string }> = {
   login: { label: "登录", glyph: "↗" },
   token: { label: "API Token", glyph: "{ }" },
@@ -578,6 +579,7 @@ export function VaultApp() {
   };
   const stageBackupImport = async (file: File) => {
     try {
+      if (file.size > MAX_BACKUP_FILE_BYTES) throw new Error("加密备份文件不能超过 8 MB");
       const parsed = JSON.parse(await file.text()) as { vault?: unknown; exportedAt?: unknown };
       const imported = toEnvelope(parsed.vault ?? parsed);
       if (!imported || !envelope) throw new Error("文件格式不正确");

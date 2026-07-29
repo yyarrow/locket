@@ -2,7 +2,7 @@ import { and, desc, eq, gt } from "drizzle-orm";
 import { db } from "@/db";
 import { sessions } from "@/db/schema";
 import { isSameOrigin, jsonError } from "@/lib/request";
-import { clearSessionCookie, getCurrentSessionId, getCurrentUser } from "@/lib/session";
+import { clearSessionCookie, getCurrentSessionId, getCurrentUser, sessionIdleCutoff } from "@/lib/session";
 
 export async function GET() {
   const user = await getCurrentUser();
@@ -11,7 +11,11 @@ export async function GET() {
   const records = await db
     .select({ id: sessions.id, userAgent: sessions.userAgent, createdAt: sessions.createdAt, lastSeenAt: sessions.lastSeenAt })
     .from(sessions)
-    .where(and(eq(sessions.userId, user.id), gt(sessions.expiresAt, new Date())))
+    .where(and(
+      eq(sessions.userId, user.id),
+      gt(sessions.expiresAt, new Date()),
+      gt(sessions.lastSeenAt, sessionIdleCutoff()),
+    ))
     .orderBy(desc(sessions.lastSeenAt));
   return Response.json({
     sessions: records.map((session) => ({ ...session, current: session.id === currentSessionId })),

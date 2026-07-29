@@ -19,6 +19,7 @@ export function AuthLinkPage({ token }: { token: string }) {
 
   useEffect(() => {
     if (!token) return;
+    window.history.replaceState(window.history.state, "", window.location.pathname);
     void post("/api/auth/verify", { token })
       .then(() => {
         setStatus("success");
